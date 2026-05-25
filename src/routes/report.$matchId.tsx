@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { getMatchById, getTeams } from "@/lib/storage";
 import { computePlayerStats, getTeamScore, MATCH_CATEGORY_LABELS } from "@/types/basketball";
 import type { Match, Player, PlayerStats } from "@/types/basketball";
 import { getQuarterScores, getTopPerformers, getMatchPlayerIds, getTeamRuns } from "@/lib/playerStats";
+import { generateMatchImage, shareOrDownloadImage } from "@/lib/shareMatchImage";
+import type { ShareRow } from "@/lib/shareMatchImage";
 
 export const Route = createFileRoute("/report/$matchId")({
   component: ReportPage,
@@ -15,11 +17,18 @@ function pct(made: number, att: number) {
   return Math.round((made / att) * 100) + '%';
 }
 
+function formatMin(minutes?: number) {
+  if (!minutes) return '–';
+  const m = Math.floor(minutes);
+  const s = Math.round((minutes - m) * 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 function ReportPage() {
   const { matchId } = Route.useParams();
   const [match, setMatch] = useState<Match | null>(null);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
-  const [shared, setShared] = useState(false);
+  const [sharing, setSharing] = useState<'idle' | 'generating' | 'done'>('idle');
 
   useEffect(() => {
     const m = getMatchById(matchId);
@@ -36,16 +45,32 @@ function ReportPage() {
     const playerIds = getMatchPlayerIds(match);
     const rowsA: { player: Player; stats: PlayerStats }[] = [];
     const rowsB: { player: Player; stats: PlayerStats }[] = [];
+
     for (const pid of playerIds) {
       const player = allPlayers.find(p => p.id === pid);
       if (!player) continue;
-      const ev = match.events.find(e => e.playerId === pid);
+      const ev = match.events.find(e => e.playerId === pid && e.type !== 'sub_in' && e.type !== 'sub_out');
       const stats = computePlayerStats(match.events, pid);
-      if (ev?.teamId === idA) rowsA.push({ player, stats });
-      else if (ev?.teamId === idB) rowsB.push({ player, stats });
+      if (ev?.teamId === idA || match.playersA.includes(pid)) rowsA.push({ player, stats });
+      else if (ev?.teamId === idB || match.playersB.includes(pid)) rowsB.push({ player, stats });
     }
+
+    // Also include players with sub events even without score events
+    for (const pid of [...match.playersA, ...match.playersB]) {
+      const already = [...rowsA, ...rowsB].some(r => r.player.id === pid);
+      if (already) continue;
+      const player = allPlayers.find(p => p.id === pid);
+      if (!player) continue;
+      const stats = computePlayerStats(match.events, pid);
+      const hasSub = match.events.some(e => e.playerId === pid);
+      if (!hasSub) continue;
+      if (match.playersA.includes(pid)) rowsA.push({ player, stats });
+      else rowsB.push({ player, stats });
+    }
+
     rowsA.sort((a, b) => b.stats.points - a.stats.points);
     rowsB.sort((a, b) => b.stats.points - a.stats.points);
+
     return {
       idA, idB, scoreA, scoreB,
       rowsA, rowsB,
@@ -55,38 +80,26 @@ function ReportPage() {
     };
   }, [match, allPlayers]);
 
-  const handleShare = async () => {
+  // ── Partage image ──
+  const handleShareImage = async () => {
     if (!match || !data) return;
-    const date = new Date(match.createdAt).toLocaleDateString('fr-FR');
-    const topP = data.top.topScorer
-      ? allPlayers.find(p => p.id === data.top.topScorer!.playerId)
-      : null;
-    const quarterLine = data.quarters.map(q =>
-      `Q${q.quarter}: ${q.a}-${q.b}`
-    ).join(' | ');
-
-    const text = [
-      `🏀 *MVP Basket — Rapport de match*`,
-      `📅 ${date}`,
-      ``,
-      `*${match.teamAName}* ${data.scoreA} — ${data.scoreB} *${match.teamBName}*`,
-      quarterLine ? `Quarts: ${quarterLine}` : '',
-      ``,
-      topP ? `⭐ MVP: ${topP.firstName} ${topP.lastName} — ${data.top.topScorer!.value} pts` : '',
-      ``,
-      `📊 Stats: ${window.location.origin}/report/${match.id}`,
-    ].filter(Boolean).join('\n');
-
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Rapport de match MVP', text });
-        setShared(true);
-        setTimeout(() => setShared(false), 2000);
-      } catch {}
-    } else {
-      // Fallback: copy + open WhatsApp
-      try { await navigator.clipboard.writeText(text); } catch {}
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    setSharing('generating');
+    try {
+      const blob = await generateMatchImage({
+        match,
+        rowsA: data.rowsA,
+        rowsB: data.rowsB,
+      });
+      if (!blob) throw new Error('Canvas failed');
+      const date = new Date(match.createdAt).toISOString().slice(0, 10);
+      await shareOrDownloadImage(
+        blob,
+        `mvp-basket-${match.teamAName}-vs-${match.teamBName}-${date}.png`
+      );
+      setSharing('done');
+      setTimeout(() => setSharing('idle'), 2000);
+    } catch {
+      setSharing('idle');
     }
   };
 
@@ -95,6 +108,7 @@ function ReportPage() {
   }
 
   const cat = match.matchCategory;
+  const hasMinutes = [...data.rowsA, ...data.rowsB].some(r => r.stats.minutesPlayed);
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -108,14 +122,19 @@ function ReportPage() {
         </div>
         <button
           type="button"
-          onClick={handleShare}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
-            shared
+          onClick={handleShareImage}
+          disabled={sharing === 'generating'}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+            sharing === 'done'
               ? 'bg-green-500/20 text-green-600'
+              : sharing === 'generating'
+              ? 'bg-primary/10 text-primary/50'
               : 'bg-primary/10 text-primary hover:bg-primary/20'
           }`}
         >
-          {shared ? '✓ Partagé !' : '📤 Partager'}
+          {sharing === 'generating' ? '⏳ Génération…'
+           : sharing === 'done' ? '✅ Partagé !'
+           : '🖼 Partager'}
         </button>
       </header>
 
@@ -138,7 +157,6 @@ function ReportPage() {
             </div>
           </div>
 
-          {/* Quart-temps */}
           {data.quarters.length > 0 && (
             <div className="mt-4">
               <p className="text-[10px] text-muted-foreground font-semibold mb-2">Par quart-temps</p>
@@ -150,15 +168,11 @@ function ReportPage() {
                 <div className="text-center text-muted-foreground font-semibold">Tot.</div>
 
                 <div className="text-muted-foreground truncate">{match.teamAName.slice(0, 8)}</div>
-                {data.quarters.map(q => (
-                  <div key={`a${q.quarter}`} className="text-center text-foreground tabular-nums">{q.a}</div>
-                ))}
+                {data.quarters.map(q => <div key={`a${q.quarter}`} className="text-center text-foreground tabular-nums">{q.a}</div>)}
                 <div className="text-center text-primary font-bold tabular-nums">{data.scoreA}</div>
 
                 <div className="text-muted-foreground truncate">{match.teamBName.slice(0, 8)}</div>
-                {data.quarters.map(q => (
-                  <div key={`b${q.quarter}`} className="text-center text-foreground tabular-nums">{q.b}</div>
-                ))}
+                {data.quarters.map(q => <div key={`b${q.quarter}`} className="text-center text-foreground tabular-nums">{q.b}</div>)}
                 <div className="text-center text-primary font-bold tabular-nums">{data.scoreB}</div>
               </div>
             </div>
@@ -178,7 +192,7 @@ function ReportPage() {
         </section>
       )}
 
-      {/* Runs / momentum */}
+      {/* Runs */}
       {data.runs.length > 0 && (
         <section className="px-5 mb-4">
           <h2 className="text-sm font-bold text-foreground mb-2">🔥 Runs d'équipe</h2>
@@ -195,8 +209,8 @@ function ReportPage() {
       )}
 
       {/* Stats par équipe */}
-      <PlayerTable title={match.teamAName} rows={data.rowsA} totalScore={data.scoreA} />
-      <PlayerTable title={match.teamBName} rows={data.rowsB} totalScore={data.scoreB} emptyHint="Pas de données joueur (équipe externe)" />
+      <PlayerTable title={match.teamAName} rows={data.rowsA} totalScore={data.scoreA} showMinutes={hasMinutes} />
+      <PlayerTable title={match.teamBName} rows={data.rowsB} totalScore={data.scoreB} showMinutes={hasMinutes} emptyHint="Pas de données joueur (équipe externe)" />
     </div>
   );
 }
@@ -222,10 +236,11 @@ function TopCard({ label, entry, players }: { label: string; entry?: { playerId:
   );
 }
 
-function PlayerTable({ title, rows, totalScore, emptyHint }: {
+function PlayerTable({ title, rows, totalScore, showMinutes, emptyHint }: {
   title: string;
   rows: { player: Player; stats: PlayerStats }[];
   totalScore: number;
+  showMinutes: boolean;
   emptyHint?: string;
 }) {
   const totals = rows.reduce((acc, r) => ({
@@ -253,6 +268,7 @@ function PlayerTable({ title, rows, totalScore, emptyHint }: {
               <tr className="text-muted-foreground border-b border-border">
                 <th className="text-left py-1.5 pr-2 font-semibold">#</th>
                 <th className="text-left py-1.5 pr-2 font-semibold">Joueur</th>
+                {showMinutes && <th className="px-1.5 py-1.5 font-semibold">MIN</th>}
                 <th className="px-1.5 py-1.5 font-semibold">PTS</th>
                 <th className="px-1.5 font-semibold">PD</th>
                 <th className="px-1.5 font-semibold">RTOT</th>
@@ -270,10 +286,11 @@ function PlayerTable({ title, rows, totalScore, emptyHint }: {
                 <tr key={player.id} className="border-b border-border/40 hover:bg-card/60">
                   <td className="py-2 pr-2 text-primary font-bold">{player.jerseyNumber ?? '–'}</td>
                   <td className="py-2 pr-2 text-foreground">
-                    <Link to="/player/$playerId" params={{ playerId: player.id }} className="hover:text-primary font-semibold inline-flex items-center gap-1">
+                    <Link to="/player/$playerId" params={{ playerId: player.id }} className="hover:text-primary font-semibold">
                       {player.firstName} {player.lastName[0]}.
                     </Link>
                   </td>
+                  {showMinutes && <td className="px-1.5 text-center text-muted-foreground">{formatMin(stats.minutesPlayed)}</td>}
                   <td className="px-1.5 text-center text-foreground font-bold">{stats.points}</td>
                   <td className="px-1.5 text-center">{stats.assists}</td>
                   <td className="px-1.5 text-center">{stats.rebounds}</td>
@@ -289,6 +306,7 @@ function PlayerTable({ title, rows, totalScore, emptyHint }: {
               <tr className="text-foreground font-bold bg-secondary/30">
                 <td className="py-2 pr-2"></td>
                 <td className="py-2 pr-2">Total</td>
+                {showMinutes && <td className="px-1.5 text-center">—</td>}
                 <td className="px-1.5 text-center text-primary">{totals.points}</td>
                 <td className="px-1.5 text-center">{totals.assists}</td>
                 <td className="px-1.5 text-center">{totals.rebounds}</td>

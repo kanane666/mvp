@@ -5,14 +5,17 @@ import { getMatches, saveMatches, getTeams, generateId, saveTeams } from "@/lib/
 import { Scoreboard } from "@/components/Scoreboard";
 import { PlayerCard } from "@/components/PlayerCard";
 import { ActionPanel } from "@/components/ActionPanel";
+import { SubstitutionPanel } from "@/components/SubstitutionPanel";
 import { FullScreenScoreboard } from "@/components/FullScreenScoreboard";
 import { getTeamScore, computePlayerStats } from "@/types/basketball";
-import type { Match, MatchEvent, Player, EventType, Team } from "@/types/basketball";
+import type { Match, MatchEvent, Player, EventType, Team, PlayerStats } from "@/types/basketball";
 import { haptics, unlockAudio } from "@/hooks/useHaptics";
 
 export const Route = createFileRoute("/match/$matchId")({
   component: LiveMatchPage,
 });
+
+type TabMode = "stats" | "subs";
 
 function LiveMatchPage() {
   const { matchId } = Route.useParams();
@@ -21,14 +24,11 @@ function LiveMatchPage() {
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [activeTeam, setActiveTeam] = useState<"A" | "B">("A");
+  const [tabMode, setTabMode] = useState<TabMode>("stats");
 
   // Timer refs
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shotClockRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Quick mode name editing
-  const [editingName, setEditingName] = useState<"A" | "B" | null>(null);
-  const [tempName, setTempName] = useState("");
 
   // Add player on the fly
   const [showAddPlayer, setShowAddPlayer] = useState(false);
@@ -42,7 +42,15 @@ function LiveMatchPage() {
     unlockAudio();
     const matches = getMatches();
     const found = matches.find(m => m.id === matchId);
-    if (found) setMatch(found);
+    if (found) {
+      // Init activePlayersA/B si pas encore définis (première ouverture)
+      const patched: Match = {
+        ...found,
+        activePlayersA: found.activePlayersA ?? found.playersA.slice(0, 5),
+        activePlayersB: found.activePlayersB ?? found.playersB.slice(0, 5),
+      };
+      setMatch(patched);
+    }
     const teams = getTeams();
     setAllTeams(teams);
     setAllPlayers(teams.flatMap(t => t.players));
@@ -129,6 +137,18 @@ function LiveMatchPage() {
   const scoreA = getTeamScore(match.events, teamAKey);
   const scoreB = getTeamScore(match.events, teamBKey);
 
+  // Stats map for SubstitutionPanel (computed once)
+  const currentRoster = activeTeam === 'A' ? match.playersA : match.playersB;
+  const statsMap: Record<string, PlayerStats> = {};
+  for (const pid of [...match.playersA, ...match.playersB]) {
+    statsMap[pid] = computePlayerStats(match.events, pid);
+  }
+
+  // Active players on court for current team
+  const activePlayersForTeam = activeTeam === 'A'
+    ? (match.activePlayersA ?? match.playersA.slice(0, 5))
+    : (match.activePlayersB ?? match.playersB.slice(0, 5));
+
   const toggleTimer = () => {
     const now = Date.now();
     const isStarting = !match.timerRunning;
@@ -180,12 +200,58 @@ function LiveMatchPage() {
       id: generateId(), playerId: selectedPlayer, teamId, type,
       quarter: match.quarter, timestamp: Date.now(),
     };
-    // Haptic feedback by event type
     if (type === '3pt_made') haptics.threePoints();
     else if (type === 'foul_committed') haptics.foul();
     else if (type.endsWith('_made') || type === 'assist' || type.includes('rebound')) haptics.action();
     persist({ ...match, events: [...match.events, event], shotClockSeconds: 24, shotClockRunning: false });
     setSelectedPlayer(null);
+  };
+
+  // ── SUBSTITUTIONS ──
+  const handleSubIn = (playerId: string) => {
+    const teamId = activeTeam === 'A' ? teamAKey : teamBKey;
+    const event: MatchEvent = {
+      id: generateId(), playerId, teamId, type: 'sub_in',
+      quarter: match.quarter, timestamp: Date.now(),
+    };
+    haptics.action();
+    if (activeTeam === 'A') {
+      persist({
+        ...match,
+        events: [...match.events, event],
+        activePlayersA: [...(match.activePlayersA ?? match.playersA.slice(0, 5)), playerId],
+      });
+    } else {
+      persist({
+        ...match,
+        events: [...match.events, event],
+        activePlayersB: [...(match.activePlayersB ?? match.playersB.slice(0, 5)), playerId],
+      });
+    }
+  };
+
+  const handleSubOut = (playerId: string) => {
+    const teamId = activeTeam === 'A' ? teamAKey : teamBKey;
+    const event: MatchEvent = {
+      id: generateId(), playerId, teamId, type: 'sub_out',
+      quarter: match.quarter, timestamp: Date.now(),
+    };
+    haptics.action();
+    if (activeTeam === 'A') {
+      persist({
+        ...match,
+        events: [...match.events, event],
+        activePlayersA: (match.activePlayersA ?? match.playersA.slice(0, 5)).filter(id => id !== playerId),
+      });
+    } else {
+      persist({
+        ...match,
+        events: [...match.events, event],
+        activePlayersB: (match.activePlayersB ?? match.playersB.slice(0, 5)).filter(id => id !== playerId),
+      });
+    }
+    // Deselect if subbed out
+    if (selectedPlayer === playerId) setSelectedPlayer(null);
   };
 
   const addTimeout = () => {
@@ -195,33 +261,41 @@ function LiveMatchPage() {
 
   const undoLast = () => {
     if (match.events.length === 0) return;
+    const lastEvent = match.events[match.events.length - 1];
     haptics.undo();
-    persist({ ...match, events: match.events.slice(0, -1) });
+    // If undoing a sub, also update activePlayersA/B
+    let updated = { ...match, events: match.events.slice(0, -1) };
+    if (lastEvent.type === 'sub_in') {
+      if (lastEvent.teamId === teamAKey) {
+        updated.activePlayersA = (updated.activePlayersA ?? []).filter(id => id !== lastEvent.playerId);
+      } else {
+        updated.activePlayersB = (updated.activePlayersB ?? []).filter(id => id !== lastEvent.playerId);
+      }
+    } else if (lastEvent.type === 'sub_out') {
+      if (lastEvent.teamId === teamAKey) {
+        updated.activePlayersA = [...(updated.activePlayersA ?? []), lastEvent.playerId];
+      } else {
+        updated.activePlayersB = [...(updated.activePlayersB ?? []), lastEvent.playerId];
+      }
+    }
+    persist(updated);
   };
 
   const endMatch = () => persist({
     ...match, status: 'finished', timerRunning: false, shotClockRunning: false,
   });
 
-  const saveTeamName = () => {
-    if (!editingName || !tempName.trim()) { setEditingName(null); return; }
-    if (editingName === 'A') persist({ ...match, teamAName: tempName.trim() });
-    else persist({ ...match, teamBName: tempName.trim() });
-    setEditingName(null);
-  };
-
   // ── Ajout joueur à la volée ──
   const handleAddPlayer = () => {
     if (!newFirstName.trim()) return;
     const teamId = activeTeam === 'A' ? (match.teamAId || '') : (match.teamBId || '');
-    const newPlayer = {
+    const newPlayer: Player = {
       id: generateId(),
       firstName: newFirstName.trim(),
       lastName: newLastName.trim() || '.',
       jerseyNumber: newJersey ? parseInt(newJersey) : undefined,
       teamId,
     };
-    // Add to team in storage
     if (teamId) {
       const teams = getTeams();
       const updated = teams.map(t =>
@@ -230,14 +304,23 @@ function LiveMatchPage() {
       saveTeams(updated);
       setAllPlayers(updated.flatMap(t => t.players));
     }
-    // Add to match player list
     const listKey = activeTeam === 'A' ? 'playersA' : 'playersB';
-    persist({ ...match, [listKey]: [...match[listKey], newPlayer.id] });
+    const activeKey = activeTeam === 'A' ? 'activePlayersA' : 'activePlayersB';
+    persist({
+      ...match,
+      [listKey]: [...match[listKey], newPlayer.id],
+      // Nouveaux joueurs commencent sur le banc — à l'entraîneur de les faire rentrer
+      [activeKey]: match[activeKey] ?? [],
+    });
     setNewFirstName(''); setNewLastName(''); setNewJersey('');
     setShowAddPlayer(false);
   };
 
-  const currentPlayers = activeTeam === 'A' ? match.playersA : match.playersB;
+  // Pour le mode stats : afficher uniquement les joueurs sur le terrain
+  const playersOnCourt = currentRoster.filter(pid =>
+    activePlayersForTeam.includes(pid)
+  );
+
   const selectedPlayerObj = selectedPlayer ? getPlayerById(selectedPlayer) || null : null;
 
   return (
@@ -249,13 +332,9 @@ function LiveMatchPage() {
           {match.status === 'live' && (
             <>
               <Button variant="ghost" size="sm" onClick={undoLast} disabled={match.events.length === 0}>
-                ↩ Annuler
+                ↩
               </Button>
-              <Button
-                variant="ghost" size="sm"
-                onClick={() => setShowAddPlayer(v => !v)}
-                className="text-primary"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowAddPlayer(v => !v)} className="text-primary">
                 + Joueur
               </Button>
             </>
@@ -284,38 +363,31 @@ function LiveMatchPage() {
           </p>
           <div className="flex gap-3">
             <Link to="/report/$matchId" params={{ matchId }}>
-              <Button size="lg" variant="default">Voir le rapport →</Button>
+              <Button size="lg">Voir le rapport →</Button>
             </Link>
             <Link to="/"><Button size="lg" variant="outline">Accueil</Button></Link>
           </div>
         </div>
       ) : (
         <>
-          {/* Add player modal */}
+          {/* Add player form */}
           {showAddPlayer && (
             <div className="px-4 mb-2">
               <div className="bg-card border border-primary/30 rounded-2xl p-4 space-y-3">
                 <p className="text-sm font-bold text-foreground">Ajouter un joueur</p>
                 <div className="flex gap-2">
                   <input
-                    type="text"
-                    placeholder="Prénom *"
-                    value={newFirstName}
-                    onChange={e => setNewFirstName(e.target.value)}
+                    type="text" placeholder="Prénom *" value={newFirstName}
+                    onChange={e => setNewFirstName(e.target.value)} autoFocus
                     className="flex-1 bg-input rounded-xl px-3 py-2 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary"
-                    autoFocus
                   />
                   <input
-                    type="text"
-                    placeholder="Nom"
-                    value={newLastName}
+                    type="text" placeholder="Nom" value={newLastName}
                     onChange={e => setNewLastName(e.target.value)}
                     className="flex-1 bg-input rounded-xl px-3 py-2 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary"
                   />
                   <input
-                    type="number"
-                    placeholder="#"
-                    value={newJersey}
+                    type="number" placeholder="#" value={newJersey}
                     onChange={e => setNewJersey(e.target.value)}
                     className="w-16 bg-input rounded-xl px-3 py-2 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary"
                   />
@@ -330,86 +402,106 @@ function LiveMatchPage() {
 
           {/* Team tabs */}
           <div className="px-4 flex gap-2 mb-2">
-            <button
-              type="button"
+            <button type="button"
               onClick={() => { setActiveTeam('A'); setSelectedPlayer(null); }}
               className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${activeTeam === 'A' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-            >
-              {match.teamAName}
-            </button>
-            <button
-              type="button"
+            >{match.teamAName}</button>
+            <button type="button"
               onClick={() => { setActiveTeam('B'); setSelectedPlayer(null); }}
               className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${activeTeam === 'B' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-            >
-              {match.teamBName}
-            </button>
+            >{match.teamBName}</button>
           </div>
 
-          {/* Edit name */}
-          {editingName && (
-            <div className="px-4 mb-2">
-              <div className="flex gap-2">
-                <input
-                  type="text" value={tempName}
-                  onChange={e => setTempName(e.target.value)}
-                  autoFocus
-                  className="flex-1 bg-input rounded-xl px-3 py-2 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary"
-                  onKeyDown={e => e.key === 'Enter' && saveTeamName()}
-                />
-                <Button size="sm" onClick={saveTeamName}>OK</Button>
-              </div>
+          {/* Stats / Rotations sub-tabs — uniquement si l'équipe a des joueurs */}
+          {currentRoster.length > 0 && (
+            <div className="px-4 flex gap-1 mb-2">
+              <button type="button"
+                onClick={() => setTabMode('stats')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tabMode === 'stats' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}
+              >📊 Stats</button>
+              <button type="button"
+                onClick={() => setTabMode('subs')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tabMode === 'subs' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}
+              >🔄 Rotations ({activePlayersForTeam.length} sur terrain)</button>
             </div>
           )}
 
           <div className="px-4 flex-1 overflow-y-auto pb-4">
+            {/* Équipe B sans joueurs = saisie rapide score adversaire */}
             {activeTeam === 'B' && match.playersB.length === 0 ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground text-center">Score adversaire (saisie rapide)</p>
                 <div className="flex gap-2">
-                  {([['ft_made', '+1'], ['2pt_made', '+2'], ['3pt_made', '+3']] as const).map(([type, label]) => (
-                    <Button key={type} variant="score" size="xl" className="flex-1" onClick={() => {
+                  {(['ft_made', '2pt_made', '3pt_made'] as const).map((type) => (
+                    <Button key={type} className="flex-1 py-5 text-xl font-black" onClick={() => {
                       const ev: MatchEvent = { id: generateId(), playerId: 'opponent', teamId: teamBKey, type, quarter: match.quarter, timestamp: Date.now() };
                       haptics.action();
                       persist({ ...match, events: [...match.events, ev], shotClockSeconds: 24 });
-                    }}>{label}</Button>
+                    }}>
+                      {type === 'ft_made' ? '+1' : type === '2pt_made' ? '+2' : '+3'}
+                    </Button>
                   ))}
                 </div>
-                <Button variant="foul" size="default" className="w-full" onClick={() => {
+                <button type="button" className="w-full bg-destructive/15 text-destructive rounded-xl py-3 text-sm font-bold border border-destructive/20" onClick={() => {
                   const ev: MatchEvent = { id: generateId(), playerId: 'opponent', teamId: teamBKey, type: 'foul_committed', quarter: match.quarter, timestamp: Date.now() };
                   haptics.foul();
                   persist({ ...match, events: [...match.events, ev] });
-                }}>🚫 Faute adverse</Button>
+                }}>🚫 Faute adverse</button>
                 <Button variant="outline" size="sm" onClick={addTimeout} className="w-full">⏱ Temps mort</Button>
               </div>
+
+            ) : tabMode === 'subs' ? (
+              /* ── ROTATIONS ── */
+              <SubstitutionPanel
+                allPlayers={allPlayers}
+                activePlayers={activePlayersForTeam}
+                allRosterIds={currentRoster}
+                statsMap={statsMap}
+                onSubIn={handleSubIn}
+                onSubOut={handleSubOut}
+              />
+
             ) : (
+              /* ── STATS + ACTIONS ── */
               <>
+                {/* Afficher joueurs sur terrain en priorité, puis banc en grisé */}
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  {currentPlayers.map(pid => {
+                  {/* Joueurs sur le terrain */}
+                  {playersOnCourt.map(pid => {
                     const p = getPlayerById(pid);
                     if (!p) return null;
-                    const stats = computePlayerStats(match.events, pid);
                     return (
                       <PlayerCard
                         key={pid}
                         player={p}
-                        stats={stats}
+                        stats={statsMap[pid]}
                         isSelected={selectedPlayer === pid}
+                        isOnCourt={true}
+                        onSelect={() => setSelectedPlayer(selectedPlayer === pid ? null : pid)}
+                      />
+                    );
+                  })}
+                  {/* Joueurs au banc (grisés, sélectionnables pour édition stats) */}
+                  {currentRoster.filter(pid => !activePlayersForTeam.includes(pid)).map(pid => {
+                    const p = getPlayerById(pid);
+                    if (!p) return null;
+                    return (
+                      <PlayerCard
+                        key={pid}
+                        player={p}
+                        stats={statsMap[pid]}
+                        isSelected={selectedPlayer === pid}
+                        isOnCourt={false}
                         onSelect={() => setSelectedPlayer(selectedPlayer === pid ? null : pid)}
                       />
                     );
                   })}
                 </div>
 
-                {/* Undo visible in action zone */}
                 {match.events.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={undoLast}
+                  <button type="button" onClick={undoLast}
                     className="w-full mb-2 py-2 rounded-xl bg-secondary/50 text-muted-foreground text-xs font-semibold active:scale-95 transition-transform border border-border/40"
-                  >
-                    ↩ Annuler la dernière action
-                  </button>
+                  >↩ Annuler la dernière action</button>
                 )}
 
                 <ActionPanel selectedPlayer={selectedPlayerObj} onAction={addEvent} />
