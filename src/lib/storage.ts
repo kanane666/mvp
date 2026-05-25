@@ -1,4 +1,5 @@
 import type { Team, Match, TrainingSession, AttendanceRecord, EvaluationRecord } from '@/types/basketball';
+import { pushTeams, pushMatches, pushSessions, pushAttendance, pushEvaluations } from './sync';
 
 const TEAMS_KEY = 'bball_teams';
 const MATCHES_KEY = 'bball_matches';
@@ -16,6 +17,8 @@ export function getTeams(): Team[] {
 
 export function saveTeams(teams: Team[]) {
   localStorage.setItem(TEAMS_KEY, JSON.stringify(teams));
+  // Sync en background — ne bloque jamais l'UI
+  pushTeams(teams).catch(() => {});
 }
 
 // ─── Matches ──────────────────────────────────────────────────────────────────
@@ -38,6 +41,7 @@ export function getMatches(): Match[] {
 
 export function saveMatches(matches: Match[]) {
   localStorage.setItem(MATCHES_KEY, JSON.stringify(matches));
+  pushMatches(matches).catch(() => {});
 }
 
 export function getMatchById(id: string): Match | undefined {
@@ -62,8 +66,10 @@ export function getTrainingSessions(): TrainingSession[] {
   const d = localStorage.getItem(SESSIONS_KEY);
   return d ? JSON.parse(d) : [];
 }
+
 export function saveTrainingSessions(s: TrainingSession[]) {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(s));
+  pushSessions(s).catch(() => {});
 }
 
 // ─── Attendance ───────────────────────────────────────────────────────────────
@@ -73,8 +79,10 @@ export function getAttendance(): AttendanceRecord[] {
   const d = localStorage.getItem(ATTENDANCE_KEY);
   return d ? JSON.parse(d) : [];
 }
+
 export function saveAttendance(a: AttendanceRecord[]) {
   localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(a));
+  pushAttendance(a).catch(() => {});
 }
 
 // ─── Evaluations ─────────────────────────────────────────────────────────────
@@ -84,8 +92,10 @@ export function getEvaluations(): EvaluationRecord[] {
   const d = localStorage.getItem(EVALUATIONS_KEY);
   return d ? JSON.parse(d) : [];
 }
+
 export function saveEvaluations(e: EvaluationRecord[]) {
   localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(e));
+  pushEvaluations(e).catch(() => {});
 }
 
 // ─── Player training stats ────────────────────────────────────────────────────
