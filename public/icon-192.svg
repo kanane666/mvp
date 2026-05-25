@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="40" fill="#0a0a14"/>
+  <circle cx="96" cy="96" r="60" fill="none" stroke="#6C5CE7" stroke-width="8"/>
+  <line x1="36" y1="96" x2="156" y2="96" stroke="#6C5CE7" stroke-width="6"/>
+  <line x1="96" y1="36" x2="96" y2="156" stroke="#6C5CE7" stroke-width="6"/>
+  <path d="M96 36 Q120 60 120 96 Q120 132 96 156" fill="none" stroke="#6C5CE7" stroke-width="6"/>
+  <path d="M96 36 Q72 60 72 96 Q72 132 96 156" fill="none" stroke="#6C5CE7" stroke-width="6"/>
+  <text x="96" y="110" text-anchor="middle" fill="#6C5CE7" font-size="36" font-weight="900" font-family="Arial">MVP</text>
+</svg>

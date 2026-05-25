@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback — toutes les routes inconnues servent index.html
+# (l'app est 100% client-side, donc le routing TanStack prend le relais)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
