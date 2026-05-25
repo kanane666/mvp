@@ -5,7 +5,7 @@ import { Sparkline } from "@/components/Sparkline";
 import { StatTile } from "@/components/StatTile";
 import { PlayerMatchRow } from "@/components/PlayerMatchRow";
 import { computePlayerStats } from "@/types/basketball";
-import { findPlayer, getPlayerMatches, getPlayerCareerStats, computeEfficiency, type CategoryFilter } from "@/lib/playerStats";
+import { findPlayer, getPlayerMatches, getPlayerCareerStats, type CategoryFilter } from "@/lib/playerStats";
 import { getPlayerTrainingStats, getEvaluations, getTrainingSessions } from "@/lib/storage";
 
 export const Route = createFileRoute("/player/$playerId")({
@@ -22,6 +22,13 @@ const FILTERS: { key: CategoryFilter; label: string }[] = [
 function pct(made: number, att: number) {
   if (!att) return '—';
   return `${Math.round((made / att) * 100)}%`;
+}
+
+function formatMin(minutes: number): string {
+  if (minutes <= 0) return '—';
+  const m = Math.floor(minutes);
+  const s = Math.round((minutes - m) * 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function PlayerProfilePage() {
@@ -77,7 +84,6 @@ function PlayerProfilePage() {
 
   const p = info.player;
   const t = career.totals;
-  const efficiency = computeEfficiency(t);
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -111,7 +117,10 @@ function PlayerProfilePage() {
             <KpiMini label="Matchs" value={career.games} />
             <KpiMini label="PTS moy" value={career.avg.points.toFixed(1)} />
             <KpiMini label="Best" value={bestGame} />
-            <KpiMini label="FG%" value={pct(t.fgMade, t.fgAttempted)} />
+            {career.avgMinutes > 0
+              ? <KpiMini label="MIN moy" value={formatMin(career.avgMinutes)} />
+              : <KpiMini label="FG%" value={pct(t.fgMade, t.fgAttempted)} />
+            }
           </div>
         </div>
       </section>
@@ -146,6 +155,12 @@ function PlayerProfilePage() {
           <StatTile label="INT" value={career.avg.steals.toFixed(1)} sub={`Total: ${t.steals}`} />
           <StatTile label="CTR" value={career.avg.blocks.toFixed(1)} sub={`Total: ${t.blocks}`} />
           <StatTile label="F" value={career.avg.fouls.toFixed(1)} sub={`Total: ${t.foulsCommitted}`} />
+          {career.avgMinutes > 0 && (
+            <StatTile label="MIN moy" value={formatMin(career.avgMinutes)} sub={`Total: ${formatMin(career.totalMinutes)}`} />
+          )}
+          {career.efficiency !== 0 && (
+            <StatTile label="Efficacité" value={career.efficiency > 0 ? `+${career.efficiency}` : String(career.efficiency)} sub="PER simplifié" />
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-2">

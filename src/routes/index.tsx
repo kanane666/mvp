@@ -150,6 +150,18 @@ function HomePage() {
             </div>
           </Link>
         </div>
+
+        <Link to="/calendar" className="block">
+          <div className="bg-card rounded-2xl p-4 border border-border hover:border-primary/40 transition-colors active:scale-[0.98]">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-foreground">📅 Calendrier</h2>
+                <p className="text-muted-foreground text-xs mt-0.5">Matchs & entraînements</p>
+              </div>
+              <span className="text-2xl">🗓️</span>
+            </div>
+          </div>
+        </Link>
       </div>
 
       <footer className="p-3 text-center">

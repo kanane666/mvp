@@ -6,6 +6,7 @@ import { computePlayerStats, getTeamScore, MATCH_CATEGORY_LABELS } from "@/types
 import type { Match, Player, PlayerStats } from "@/types/basketball";
 import { getQuarterScores, getTopPerformers, getMatchPlayerIds, getTeamRuns } from "@/lib/playerStats";
 import { generateMatchImage, shareOrDownloadImage } from "@/lib/shareMatchImage";
+// pdfExport chargé dynamiquement pour réduire le bundle initial
 import type { ShareRow } from "@/lib/shareMatchImage";
 
 export const Route = createFileRoute("/report/$matchId")({
@@ -29,6 +30,7 @@ function ReportPage() {
   const [match, setMatch] = useState<Match | null>(null);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [sharing, setSharing] = useState<'idle' | 'generating' | 'done'>('idle');
+  const [pdfState, setPdfState] = useState<'idle' | 'generating' | 'done'>('idle');
 
   useEffect(() => {
     const m = getMatchById(matchId);
@@ -103,6 +105,25 @@ function ReportPage() {
     }
   };
 
+  const handleExportPDF = async () => {
+    if (!match || !data) return;
+    setPdfState('generating');
+    try {
+      const { generateMatchPDF } = await import('@/lib/pdfExport');
+      await generateMatchPDF({
+        match,
+        rowsA: data.rowsA,
+        rowsB: data.rowsB,
+        allPlayers,
+      });
+      setPdfState('done');
+      setTimeout(() => setPdfState('idle'), 2500);
+    } catch (e) {
+      console.error('PDF error:', e);
+      setPdfState('idle');
+    }
+  };
+
   if (!match || !data) {
     return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">Chargement…</div>;
   }
@@ -120,22 +141,36 @@ function ReportPage() {
             {new Date(match.createdAt).toLocaleDateString('fr-FR')} {cat && `· ${MATCH_CATEGORY_LABELS[cat]}`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleShareImage}
-          disabled={sharing === 'generating'}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
-            sharing === 'done'
-              ? 'bg-green-500/20 text-green-600'
-              : sharing === 'generating'
-              ? 'bg-primary/10 text-primary/50'
-              : 'bg-primary/10 text-primary hover:bg-primary/20'
-          }`}
-        >
-          {sharing === 'generating' ? '⏳ Génération…'
-           : sharing === 'done' ? '✅ Partagé !'
-           : '🖼 Partager'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleShareImage}
+            disabled={sharing === 'generating'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+              sharing === 'done'
+                ? 'bg-green-500/20 text-green-600'
+                : sharing === 'generating'
+                ? 'bg-primary/10 text-primary/50'
+                : 'bg-primary/10 text-primary hover:bg-primary/20'
+            }`}
+          >
+            {sharing === 'generating' ? '⏳…' : sharing === 'done' ? '✅' : '🖼'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            disabled={pdfState === 'generating'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+              pdfState === 'done'
+                ? 'bg-green-500/20 text-green-600'
+                : pdfState === 'generating'
+                ? 'bg-secondary text-muted-foreground'
+                : 'bg-secondary text-foreground hover:bg-secondary/80'
+            }`}
+          >
+            {pdfState === 'generating' ? '⏳ PDF…' : pdfState === 'done' ? '✅ PDF prêt !' : '📄 PDF'}
+          </button>
+        </div>
       </header>
 
       {/* Score + quarts */}

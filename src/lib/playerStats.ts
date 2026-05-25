@@ -26,6 +26,8 @@ export function getPlayerMatches(playerId: string, filter: CategoryFilter = 'all
 export interface CareerStats {
   games: number;
   totals: PlayerStats;
+  totalMinutes: number;      // minutes totales jouées (via sub_in/sub_out)
+  avgMinutes: number;        // moyenne par match (0 si pas de données rotation)
   avg: { points: number; rebounds: number; assists: number; fouls: number; steals: number; blocks: number };
   efficiency: number; // PER simplifié
 }
@@ -46,6 +48,9 @@ export function computeEfficiency(s: PlayerStats): number {
 export function getPlayerCareerStats(playerId: string, filter: CategoryFilter = 'all'): CareerStats {
   const matches = getPlayerMatches(playerId, filter);
   const totals = emptyStats();
+  let totalMinutes = 0;
+  let matchesWithMinutes = 0;
+
   for (const m of matches) {
     const s = computePlayerStats(m.events, playerId);
     totals.points += s.points;
@@ -58,11 +63,17 @@ export function getPlayerCareerStats(playerId: string, filter: CategoryFilter = 
     totals.blocks += s.blocks; totals.steals += s.steals;
     totals.turnovers += s.turnovers;
     totals.foulsCommitted += s.foulsCommitted; totals.foulsDrawn += s.foulsDrawn;
+    if (s.minutesPlayed) {
+      totalMinutes += s.minutesPlayed;
+      matchesWithMinutes++;
+    }
   }
   const g = matches.length || 1;
   return {
     games: matches.length,
     totals,
+    totalMinutes,
+    avgMinutes: matchesWithMinutes > 0 ? totalMinutes / matchesWithMinutes : 0,
     avg: {
       points: totals.points / g,
       rebounds: totals.rebounds / g,

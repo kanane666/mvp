@@ -102,25 +102,7 @@ function SettingsPage() {
           )}
         </section>
 
-        {/* ── SQL Supabase ── */}
-        {!isSupabaseConfigured && (
-          <section className="bg-card rounded-2xl p-5 border border-primary/20">
-            <h2 className="text-sm font-bold text-foreground mb-2">🗄️ SQL à exécuter dans Supabase</h2>
-            <p className="text-xs text-muted-foreground mb-3">
-              Dans ton projet Supabase → <span className="font-semibold">SQL Editor</span> → colle et exécute ce code :
-            </p>
-            <div className="bg-secondary rounded-xl p-3 overflow-x-auto">
-              <pre className="text-[10px] text-foreground font-mono whitespace-pre">{SQL_SETUP}</pre>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard?.writeText(SQL_SETUP)}
-              className="mt-2 w-full py-2 rounded-xl bg-primary/10 text-primary text-xs font-semibold active:scale-95 transition-transform"
-            >
-              📋 Copier le SQL
-            </button>
-          </section>
-        )}
+
 
         {/* ── Sauvegarde locale ── */}
         <section className="bg-card rounded-2xl p-5 border border-border space-y-4">
@@ -167,111 +149,41 @@ function SettingsPage() {
         </section>
 
         {/* ── À propos ── */}
-        <section className="bg-card rounded-2xl p-5 border border-border">
-          <h2 className="text-sm font-bold text-foreground mb-2">ℹ️ À propos</h2>
-          <p className="text-xs text-muted-foreground">MVP Basket Sénégal — v3.0</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Cloud : {isSupabaseConfigured ? '✅ Configuré' : '❌ Non configuré'}
-          </p>
+        <section className="bg-card rounded-2xl p-5 border border-border space-y-3">
+          <h2 className="text-sm font-bold text-foreground">ℹ️ À propos</h2>
+
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center text-2xl flex-shrink-0">
+              🏀
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">MVP Basket Sénégal</p>
+              <p className="text-xs text-muted-foreground">Application de suivi de stats basketball</p>
+              <p className="text-[10px] text-primary font-semibold mt-0.5">Version 3.0</p>
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-2">Développeur</p>
+            <p className="text-sm font-bold text-foreground">Ababacar Dieng</p>
+            <p className="text-xs text-muted-foreground">Génie Logiciel</p>
+            <a
+              href="mailto:diengbabacar666@gmail.com"
+              className="text-xs text-primary font-semibold mt-1 inline-block hover:underline"
+            >
+              diengbabacar666@gmail.com
+            </a>
+          </div>
+
+          <div className="border-t border-border pt-3 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Cloud Supabase</p>
+            <span className={`text-xs font-bold ${isSupabaseConfigured ? 'text-green-500' : 'text-muted-foreground'}`}>
+              {isSupabaseConfigured ? '✅ Actif' : '⚪ Non configuré'}
+            </span>
+          </div>
         </section>
       </div>
     </div>
   );
 }
 
-// ─── SQL de setup Supabase ────────────────────────────────────────────────────
-const SQL_SETUP = `-- MVP Basket Sénégal — Setup Supabase
--- Colle ce SQL dans: Supabase Dashboard → SQL Editor → Run
-
--- Active l'extension uuid
-create extension if not exists "uuid-ossp";
-
--- Table équipes
-create table if not exists teams (
-  id text primary key,
-  user_id uuid references auth.users(id) on delete cascade,
-  name text not null,
-  category text,
-  gender text,
-  players jsonb default '[]',
-  "createdAt" bigint,
-  updated_at timestamptz default now()
-);
-
--- Table matchs
-create table if not exists matches (
-  id text primary key,
-  user_id uuid references auth.users(id) on delete cascade,
-  mode text,
-  "matchCategory" text,
-  "teamAName" text,
-  "teamBName" text,
-  "teamAId" text,
-  "teamBId" text,
-  "playersA" jsonb default '[]',
-  "playersB" jsonb default '[]',
-  events jsonb default '[]',
-  quarter int default 1,
-  "timerSeconds" int default 600,
-  "timerRunning" boolean default false,
-  "shotClockSeconds" int default 24,
-  "shotClockRunning" boolean default false,
-  "timeoutsA" int default 0,
-  "timeoutsB" int default 0,
-  status text default 'live',
-  "createdAt" bigint,
-  updated_at timestamptz default now()
-);
-
--- Table sessions d'entraînement
-create table if not exists training_sessions (
-  id text primary key,
-  user_id uuid references auth.users(id) on delete cascade,
-  "teamId" text,
-  date bigint,
-  notes text,
-  "createdAt" bigint
-);
-
--- Table présences
-create table if not exists attendance (
-  session_id text,
-  player_id text,
-  user_id uuid references auth.users(id) on delete cascade,
-  status text,
-  primary key (session_id, player_id)
-);
-
--- Table évaluations
-create table if not exists evaluations (
-  session_id text,
-  player_id text,
-  user_id uuid references auth.users(id) on delete cascade,
-  rating int,
-  primary key (session_id, player_id)
-);
-
--- Row Level Security : chaque utilisateur ne voit que ses données
-alter table teams enable row level security;
-alter table matches enable row level security;
-alter table training_sessions enable row level security;
-alter table attendance enable row level security;
-alter table evaluations enable row level security;
-
-create policy "teams_own" on teams
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "matches_own" on matches
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "sessions_own" on training_sessions
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "attendance_own" on attendance
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "evaluations_own" on evaluations
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
--- Activer Anonymous Auth dans Supabase Dashboard:
--- Authentication → Providers → Anonymous Sign-ins → Enable`;

@@ -8,6 +8,13 @@ function pct(made: number, att: number) {
   return `${Math.round((made / att) * 100)}%`;
 }
 
+function formatMin(minutes?: number): string {
+  if (!minutes || minutes <= 0) return '—';
+  const m = Math.floor(minutes);
+  const s = Math.round((minutes - m) * 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 function getPlayerQuarterPoints(m: Match, playerId: string): { q: number; pts: number }[] {
   const maxQ = Math.max(1, ...m.events.map(e => e.quarter));
   const out: { q: number; pts: number }[] = [];
@@ -81,6 +88,17 @@ export function PlayerMatchRow({ match, playerId, teamId }: { match: Match; play
             <Mini label="F.PROV" main={s.foulsDrawn} />
             <Mini label="PTS" main={s.points} accent />
           </div>
+          {/* Temps de jeu — affiché uniquement si données de rotation disponibles */}
+          {s.minutesPlayed && s.minutesPlayed > 0 ? (
+            <div className="flex items-center gap-2 bg-primary/8 rounded-xl px-3 py-2 border border-primary/15">
+              <span className="text-primary text-sm">⏱</span>
+              <div>
+                <p className="text-xs font-bold text-foreground">Temps de jeu</p>
+                <p className="text-[10px] text-muted-foreground">Ce match</p>
+              </div>
+              <p className="ml-auto text-lg font-black text-primary tabular-nums">{formatMin(s.minutesPlayed)}</p>
+            </div>
+          ) : null}
 
           {/* Shooting % */}
           <div className="grid grid-cols-3 gap-1.5">
