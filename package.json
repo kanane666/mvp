@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development && node scripts/generate-spa-index.js",
     "preview": "vite preview",
     "lint": "eslint .",
-    "build:vercel": "vite build"
+    "build:vercel": "vite build && node scripts/patch-sw.js"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

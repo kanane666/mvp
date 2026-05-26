@@ -75,6 +75,20 @@ function PlayerProfilePage() {
       .map(e => e.rating);
   }, [playerId, tick]);
 
+  // handleShareProfile doit être AVANT tout return conditionnel
+  const handleShareProfile = async () => {
+    if (!info || !career) return;
+    setSharingProfile('generating');
+    try {
+      const blob = await generatePlayerProfileImage(info.player, career, info.teamName);
+      if (!blob) throw new Error('Canvas failed');
+      const name = `${info.player.firstName}-${info.player.lastName}`.replace(/[^a-zA-Z0-9]/g, '-');
+      await sharePlayerImage(blob, `mvp-basket-profil-${name}.png`);
+      setSharingProfile('done');
+      setTimeout(() => setSharingProfile('idle'), 2000);
+    } catch { setSharingProfile('idle'); }
+  };
+
   if (!info) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center text-muted-foreground gap-3">

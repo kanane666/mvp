@@ -23,7 +23,53 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            // Détecter une nouvelle version disponible
+            reg.addEventListener('updatefound', () => {
+              const newSW = reg.installing;
+              if (!newSW) return;
+              newSW.addEventListener('statechange', () => {
+                // Nouveau SW installé et en attente
+                if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Afficher bannière de mise à jour
+                  const banner = document.createElement('div');
+                  banner.id = 'update-banner';
+                  banner.style.cssText = [
+                    'position:fixed','bottom:16px','left:50%','transform:translateX(-50%)',
+                    'background:#7c6ff5','color:#fff','padding:12px 20px','border-radius:14px',
+                    'font:600 13px/1 system-ui','z-index:9999','display:flex',
+                    'align-items:center','gap:12px','box-shadow:0 4px 24px rgba(0,0,0,.4)',
+                    'max-width:calc(100vw - 32px)'
+                  ].join(';');
+                  banner.innerHTML = `
+                    <span>🔄 Mise à jour disponible !</span>
+                    <button onclick="
+                      newSW.postMessage('SKIP_WAITING');
+                      window.location.reload();
+                    " style="background:rgba(255,255,255,.25);border:none;color:#fff;padding:6px 14px;border-radius:8px;font:700 12px system-ui;cursor:pointer">
+                      Mettre à jour
+                    </button>
+                    <button onclick="document.getElementById('update-banner').remove()"
+                      style="background:none;border:none;color:rgba(255,255,255,.7);font-size:18px;cursor:pointer;line-height:1">×</button>
+                  `;
+                  // Stocker newSW pour le bouton onclick
+                  window.__pendingSW = newSW;
+                  banner.querySelector('button').onclick = () => {
+                    window.__pendingSW.postMessage('SKIP_WAITING');
+                    window.location.reload();
+                  };
+                  document.body.appendChild(banner);
+                }
+              });
+            });
+
+            // Si le SW vient de prendre le contrôle (après skipWaiting), recharger proprement
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (!refreshing) { refreshing = true; window.location.reload(); }
+            });
+
+          }).catch(() => {});
         });
       }
     </script>
