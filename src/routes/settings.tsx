@@ -1,9 +1,22 @@
+import React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { downloadBackup, importBackup } from "@/lib/storage";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { isSupabaseConfigured, checkSupabaseConnection } from "@/lib/supabase";
+
+function TutoStep({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 items-start">
+      <span className="text-xl flex-shrink-0 mt-0.5">{icon}</span>
+      <div>
+        <p className="text-xs font-bold text-foreground mb-0.5">{title}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{children}</p>
+      </div>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -57,47 +70,42 @@ function SettingsPage() {
       <div className="px-5 space-y-4 pb-12">
 
         {/* ── État de sync ── */}
-        <section className="bg-card rounded-2xl p-5 border border-border">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-bold text-foreground">☁️ Synchronisation cloud</h2>
-            <span className={`text-xs font-semibold ${statusInfo.color}`}>
-              {statusInfo.icon} {statusInfo.text}
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground mb-4">
-            {isSupabaseConfigured
-              ? 'Tes données sont sauvegardées automatiquement dans le cloud.'
-              : 'Cloud non configuré — données stockées uniquement sur cet appareil.'}
-          </p>
+        {/* ── Tutoriel ── */}
+        <section className="bg-card rounded-2xl p-5 border border-border space-y-4">
+          <h2 className="text-sm font-bold text-foreground">📖 Guide d'utilisation</h2>
 
-          {isSupabaseConfigured ? (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={testConnection}
-                className="w-full py-2 rounded-xl bg-primary/10 text-primary text-sm font-semibold active:scale-95 transition-transform"
-              >
-                Tester la connexion
-              </button>
-              {connTested !== null && (
-                <p className={`text-xs font-semibold text-center ${connTested ? 'text-green-600' : 'text-destructive'}`}>
-                  {connTested ? '✅ Connexion Supabase OK !' : '❌ Connexion échouée — vérifie tes clés dans .env'}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="bg-secondary/60 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold text-foreground">Comment activer le cloud :</p>
-              <ol className="text-xs text-muted-foreground space-y-2 list-decimal list-inside">
-                <li>Crée un compte gratuit sur <span className="text-primary font-semibold">supabase.com</span></li>
-                <li>Crée un nouveau projet (gratuit)</li>
-                <li>Va dans <span className="font-semibold">Settings → API</span></li>
-                <li>Copie ton <span className="font-semibold">Project URL</span> et ton <span className="font-semibold">anon public key</span></li>
-                <li>Ouvre le fichier <span className="font-mono text-primary">.env</span> à la racine du projet</li>
-                <li>Remplace les deux valeurs <span className="font-mono">REMPLACER_PAR_...</span></li>
-                <li>Exécute le SQL dans <span className="font-semibold">Étape SQL Supabase</span> ci-dessous</li>
-                <li>Push sur GitHub → Vercel redéploie automatiquement</li>
-              </ol>
+          <TutoStep icon="👥" title="1. Créer ton équipe">
+            Va dans <b>Équipes</b> → clique <b>+ Créer</b> → renseigne le nom, la catégorie et ajoute tes joueurs avec leur numéro de maillot.
+          </TutoStep>
+
+          <TutoStep icon="⚡" title="2. Match rapide (scoreboard)">
+            Depuis l'accueil, choisis <b>Match rapide</b>. Un grand scoreboard s'affiche. Touche les boutons <b>+1 / +2 / +3</b> pour marquer les points de chaque équipe. Le chrono et les 24s se gèrent avec les boutons du centre. Le bouton ↩ annule la dernière action.
+          </TutoStep>
+
+          <TutoStep icon="📊" title="3. Mode assistant (stats complètes)">
+            Choisis <b>Mode Assistant</b>, sélectionne tes équipes et commence le match. Touche d'abord <b>un joueur</b> dans la liste, puis l'<b>action</b> correspondante (+2, +3, rebond, passe…). L'onglet <b>Rotations</b> te permet de gérer les entrées/sorties et de suivre le temps de jeu.
+          </TutoStep>
+
+          <TutoStep icon="📋" title="4. Voir le rapport">
+            Quand le match est terminé, clique <b>Voir le rapport</b>. Tu y trouveras le score par quart-temps, les tops performers et le tableau complet des stats. Utilise <b>🖼 Partager</b> pour envoyer une image ou <b>📄 PDF</b> pour une feuille de match officielle.
+          </TutoStep>
+
+          <TutoStep icon="🏋️" title="5. Gérer les entraînements">
+            Dans <b>Entraînements</b> → crée une session pour une équipe → marque les joueurs présents et donne une note à chacun. Ces données apparaissent dans le profil de chaque joueur.
+          </TutoStep>
+
+          <TutoStep icon="📅" title="6. Suivre le calendrier">
+            <b>Calendrier</b> affiche tous tes matchs et entraînements. Les points violets = matchs, amber = entraînements. Touche un jour pour voir le détail.
+          </TutoStep>
+
+          <TutoStep icon="💾" title="7. Sauvegarder tes données">
+            Va dans <b>Sauvegarde manuelle</b> ci-dessous et télécharge un fichier JSON. Garde-le précieusement. Si tu changes d'appareil, importe ce fichier pour retrouver toutes tes données.
+          </TutoStep>
+
+          {isSupabaseConfigured && (
+            <div className="pt-2 border-t border-border flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Synchronisation cloud</p>
+              <span className={`text-xs font-bold ${statusInfo.color}`}>{statusInfo.icon} {statusInfo.text}</span>
             </div>
           )}
         </section>

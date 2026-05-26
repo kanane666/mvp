@@ -237,6 +237,19 @@ export async function generateMatchPDF(opts: PdfOptions): Promise<void> {
     y += runs.length * 7 + 16;
   }
 
+  // ── Légende des abréviations ──
+  if (y + 30 < PH - 14) {
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...GRAY);
+    doc.text('LÉGENDE :', ML, y + 8);
+    doc.setFont('helvetica', 'normal');
+    const legend = 'PTS=Points  PD=Passe Décisive  RTO=Rebonds Total  RO=Rebond Offensif  RD=Rebond Défensif  INT=Interception  CTR=Contre  BP=Ballon Perdu  F=Fautes  FG=Tirs de jeu (M/T=Marqués/Tentés)  3P=Paniers à 3pts  LF=Lancers Francs  MIN=Minutes jouées';
+    const legendLines = doc.splitTextToSize(legend, CW);
+    doc.text(legendLines, ML, y + 14);
+    y += 8 + legendLines.length * 7;
+  }
+
   // ── Pied de page ──
   const footerY = PH - 10;
   doc.setFontSize(7);
@@ -289,21 +302,21 @@ function drawTeamTable(
 
   // Colonnes
   const cols = [
-    { h: '#',    w: 7,  align: 'center' as const, key: 'jerseyNumber' },
-    { h: 'JOUEUR', w: hasMinutes ? 28 : 34, align: 'left' as const,   key: 'name' },
-    ...(hasMinutes ? [{ h: 'MIN', w: 14, align: 'center' as const, key: 'minutes' }] : []),
-    { h: 'PTS',  w: 11, align: 'center' as const, key: 'points' },
-    { h: 'PD',   w: 10, align: 'center' as const, key: 'assists' },
-    { h: 'RTO',  w: 10, align: 'center' as const, key: 'rebounds' },
-    { h: 'RO',   w: 9,  align: 'center' as const, key: 'offRebounds' },
-    { h: 'RD',   w: 9,  align: 'center' as const, key: 'defRebounds' },
-    { h: 'INT',  w: 10, align: 'center' as const, key: 'steals' },
-    { h: 'CTR',  w: 10, align: 'center' as const, key: 'blocks' },
-    { h: 'BP',   w: 10, align: 'center' as const, key: 'turnovers' },
-    { h: 'F',    w: 8,  align: 'center' as const, key: 'fouls' },
-    { h: 'FG%',  w: 13, align: 'center' as const, key: 'fg' },
-    { h: '3P%',  w: 13, align: 'center' as const, key: 'fg3' },
-    { h: 'LF%',  w: 12, align: 'center' as const, key: 'ft' },
+    { h: '#',       w: 7,  align: 'center' as const, key: 'jerseyNumber' },
+    { h: 'JOUEUR',  w: hasMinutes ? 24 : 28, align: 'left' as const, key: 'name' },
+    ...(hasMinutes ? [{ h: 'MIN', w: 12, align: 'center' as const, key: 'minutes' }] : []),
+    { h: 'PTS',     w: 10, align: 'center' as const, key: 'points' },
+    { h: 'PD',      w: 9,  align: 'center' as const, key: 'assists' },
+    { h: 'RTO',     w: 9,  align: 'center' as const, key: 'rebounds' },
+    { h: 'RO',      w: 8,  align: 'center' as const, key: 'offRebounds' },
+    { h: 'RD',      w: 8,  align: 'center' as const, key: 'defRebounds' },
+    { h: 'INT',     w: 9,  align: 'center' as const, key: 'steals' },
+    { h: 'CTR',     w: 9,  align: 'center' as const, key: 'blocks' },
+    { h: 'BP',      w: 9,  align: 'center' as const, key: 'turnovers' },
+    { h: 'F',       w: 7,  align: 'center' as const, key: 'fouls' },
+    { h: 'FG (M/T)', w: 18, align: 'center' as const, key: 'fg' },
+    { h: '3P (M/T)', w: 18, align: 'center' as const, key: 'fg3' },
+    { h: 'LF (M/T)', w: 17, align: 'center' as const, key: 'ft' },
   ];
 
   // Fond header colonnes
@@ -343,7 +356,7 @@ function drawTeamTable(
 
     const vals: Record<string, string> = {
       jerseyNumber: row.player.jerseyNumber !== undefined ? String(row.player.jerseyNumber) : '–',
-      name: `${row.player.firstName[0]}. ${row.player.lastName}`.slice(0, hasMinutes ? 16 : 20),
+      name: `${row.player.firstName[0]}. ${row.player.lastName}`.slice(0, hasMinutes ? 13 : 16),
       minutes: formatMin(row.stats.minutesPlayed),
       points: String(row.stats.points),
       assists: String(row.stats.assists),
@@ -354,9 +367,9 @@ function drawTeamTable(
       blocks: String(row.stats.blocks),
       turnovers: String(row.stats.turnovers),
       fouls: String(row.stats.foulsCommitted),
-      fg: pct(row.stats.fgMade, row.stats.fgAttempted),
-      fg3: pct(row.stats.fg3Made, row.stats.fg3Attempted),
-      ft: pct(row.stats.ftMade, row.stats.ftAttempted),
+      fg:  `${row.stats.fgMade}/${row.stats.fgAttempted} (${pct(row.stats.fgMade, row.stats.fgAttempted)})`,
+      fg3: `${row.stats.fg3Made}/${row.stats.fg3Attempted} (${pct(row.stats.fg3Made, row.stats.fg3Attempted)})`,
+      ft:  `${row.stats.ftMade}/${row.stats.ftAttempted} (${pct(row.stats.ftMade, row.stats.ftAttempted)})`,
     };
 
     cx = x;

@@ -6,6 +6,7 @@ import { StatTile } from "@/components/StatTile";
 import { PlayerMatchRow } from "@/components/PlayerMatchRow";
 import { computePlayerStats } from "@/types/basketball";
 import { findPlayer, getPlayerMatches, getPlayerCareerStats, type CategoryFilter } from "@/lib/playerStats";
+import { generatePlayerProfileImage, sharePlayerImage } from "@/lib/sharePlayerImage";
 import { getPlayerTrainingStats, getEvaluations, getTrainingSessions } from "@/lib/storage";
 
 export const Route = createFileRoute("/player/$playerId")({
@@ -34,6 +35,7 @@ function formatMin(minutes: number): string {
 function PlayerProfilePage() {
   const { playerId } = Route.useParams();
   const [filter, setFilter] = useState<CategoryFilter>('all');
+  const [sharingProfile, setSharingProfile] = useState<'idle'|'generating'|'done'>('idle');
   const [sortBy, setSortBy] = useState<'date' | 'points'>('date');
   const [tick, setTick] = useState(0);
 
@@ -90,7 +92,19 @@ function PlayerProfilePage() {
       {/* Header */}
       <header className="px-5 pt-8 pb-3 flex items-center gap-2">
         <Link to="/stats"><Button variant="ghost" size="icon">←</Button></Link>
-        <h1 className="text-lg font-bold text-foreground">Profil joueur</h1>
+        <h1 className="text-lg font-bold text-foreground flex-1">Profil joueur</h1>
+        <button
+          type="button"
+          onClick={handleShareProfile}
+          disabled={sharingProfile === 'generating'}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+            sharingProfile === 'done' ? 'bg-green-500/20 text-green-600'
+            : sharingProfile === 'generating' ? 'bg-primary/10 text-primary/50'
+            : 'bg-primary/10 text-primary'
+          }`}
+        >
+          {sharingProfile === 'generating' ? '⏳' : sharingProfile === 'done' ? '✅' : '🖼 Partager'}
+        </button>
       </header>
 
       {/* Hero card */}
@@ -217,7 +231,7 @@ function PlayerProfilePage() {
         ) : (
           <div className="space-y-2">
             {sortedMatches.map(m => (
-              <PlayerMatchRow key={m.id} match={m} playerId={playerId} teamId={info.teamId} />
+              <PlayerMatchRow key={m.id} match={m} playerId={playerId} teamId={info.teamId} player={p} />
             ))}
           </div>
         )}

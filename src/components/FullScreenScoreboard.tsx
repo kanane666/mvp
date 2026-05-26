@@ -120,16 +120,27 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
   // Unlock audio on mount
   useEffect(() => { unlockAudio(); }, []);
 
-  // Game timer — drift-free (tick every 500ms, compute from wall clock)
+  // ── Timer unifié : chrono + shot clock synchronisés ──────────────────────────
+  // Le shot clock est ESCLAVE du chrono : même startedAt, s'arrête/repart ensemble.
+  // Les deux décomptent depuis le même instant de référence.
   useEffect(() => {
     if (!match.timerRunning) return;
-    const startedAt = match.timerStartedAt ?? Date.now();
-    const secondsAtStart = match.timerSecondsAtStart ?? match.timerSeconds;
+
+    const startedAt     = match.timerStartedAt ?? Date.now();
+    const gameAtStart   = match.timerSecondsAtStart ?? match.timerSeconds;
+    // Shot clock : si running, utilise son propre seconsdAtStart, sinon figé
+    const shotAtStart   = match.shotClockSecondsAtStart ?? match.shotClockSeconds;
+    const shotWasRunning = match.shotClockRunning;
+
     const id = setInterval(() => {
       const m = matchRef.current;
       const elapsed = (Date.now() - startedAt) / 1000;
-      const remaining = Math.max(0, secondsAtStart - elapsed);
-      if (remaining <= 0) {
+
+      // ── Game clock ──
+      const gameRemaining = Math.max(0, gameAtStart - elapsed);
+
+      if (gameRemaining <= 0) {
+        // Fin de quart-temps
         if (m.quarter < MAX_QUARTERS) {
           haptics.buzzer();
           persistRef.current({
@@ -141,36 +152,40 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
             timerSecondsAtStart: undefined,
             shotClockSeconds: 24,
             shotClockRunning: false,
+            shotClockStartedAt: undefined,
+            shotClockSecondsAtStart: undefined,
           });
         } else {
           haptics.buzzer();
-          persistRef.current({ ...m, timerSeconds: 0, timerRunning: false });
+          persistRef.current({
+            ...m,
+            timerSeconds: 0,
+            timerRunning: false,
+            shotClockRunning: false,
+          });
         }
         return;
       }
-      persistRef.current({ ...m, timerSeconds: Math.round(remaining) });
-    }, 500);
-    return () => clearInterval(id);
-  }, [match.timerRunning]);
 
-  // Shot clock — drift-free
-  useEffect(() => {
-    if (!match.shotClockRunning || match.shotClockSeconds <= 0) return;
-    const startedAt = match.shotClockStartedAt ?? Date.now();
-    const secondsAtStart = match.shotClockSecondsAtStart ?? match.shotClockSeconds;
-    const id = setInterval(() => {
-      const m = matchRef.current;
-      const elapsed = (Date.now() - startedAt) / 1000;
-      const remaining = Math.max(0, secondsAtStart - elapsed);
-      if (remaining <= 5 && remaining > 4.5) haptics.shotClockWarning();
-      if (remaining <= 0) {
-        persistRef.current({ ...m, shotClockSeconds: 0, shotClockRunning: false });
-      } else {
-        persistRef.current({ ...m, shotClockSeconds: Math.round(remaining) });
+      // ── Shot clock (synchronisé au même elapsed) ──
+      let shotRemaining = m.shotClockSeconds;
+      if (shotWasRunning) {
+        shotRemaining = Math.max(0, shotAtStart - elapsed);
+        if (shotRemaining <= 5 && shotRemaining > 4.5) haptics.shotClockWarning();
       }
-    }, 500);
+
+      // Shot clock ne peut pas dépasser le game clock
+      const syncedShot = Math.min(Math.round(shotRemaining), Math.round(gameRemaining));
+
+      persistRef.current({
+        ...m,
+        timerSeconds: Math.round(gameRemaining),
+        shotClockSeconds: shotWasRunning ? syncedShot : m.shotClockSeconds,
+      });
+    }, 250); // 250ms pour plus de fluidité
+
     return () => clearInterval(id);
-  }, [match.shotClockRunning]);
+  }, [match.timerRunning, match.timerStartedAt]);
 
   const teamAKey = match.teamAId || 'A';
   const teamBKey = match.teamBId || 'B';
@@ -186,7 +201,15 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
     const event: MatchEvent = {
       id: generateId(), playerId: 'team', teamId, type, quarter: match.quarter, timestamp: Date.now(),
     };
-    persist({ ...match, events: [...match.events, event], shotClockSeconds: 24 });
+    const now = Date.now();
+    persist({
+      ...match,
+      events: [...match.events, event],
+      shotClockSeconds: 24,
+      shotClockRunning: match.timerRunning, // repart si le chrono tourne
+      shotClockStartedAt: match.timerRunning ? now : undefined,
+      shotClockSecondsAtStart: match.timerRunning ? 24 : undefined,
+    });
   };
 
   const addFoul = (team: 'A' | 'B') => {
@@ -355,6 +378,10 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
                     timerRunning: isStarting,
                     timerStartedAt: isStarting ? now : undefined,
                     timerSecondsAtStart: isStarting ? match.timerSeconds : undefined,
+                    // Shot clock suit le chrono : démarre/s'arrête en même temps
+                    shotClockRunning: isStarting ? match.shotClockSeconds > 0 : false,
+                    shotClockStartedAt: isStarting ? now : undefined,
+                    shotClockSecondsAtStart: isStarting ? match.shotClockSeconds : undefined,
                   });
                 }}
               onDoubleClick={startEditTimer}
@@ -373,6 +400,8 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
           <div className="flex flex-col items-center">
             <button
               onClick={() => {
+                  // Shot clock indépendant seulement si chrono arrêté
+                  if (match.timerRunning) return;
                   const isStarting = !match.shotClockRunning;
                   const now = Date.now();
                   persist({
@@ -387,7 +416,17 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
               {match.shotClockSeconds}
             </button>
             <button
-              onClick={() => persist({ ...match, shotClockSeconds: 24, shotClockRunning: false, shotClockStartedAt: undefined })}
+              onClick={() => {
+                const now = Date.now();
+                persist({
+                  ...match,
+                  shotClockSeconds: 24,
+                  // Si le chrono tourne, les 24s repartent immédiatement
+                  shotClockRunning: match.timerRunning,
+                  shotClockStartedAt: match.timerRunning ? now : undefined,
+                  shotClockSecondsAtStart: match.timerRunning ? 24 : undefined,
+                });
+              }}
               className="text-xs text-muted-foreground mt-1 hover:text-primary active:scale-90 min-h-[32px] px-2"
             >
               ↻ 24s

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { generatePlayerMatchImage, sharePlayerImage } from "@/lib/sharePlayerImage";
+import type { Player } from "@/types/basketball";
 import { Link } from "@tanstack/react-router";
 import { computePlayerStats, getTeamScore, MATCH_CATEGORY_LABELS } from "@/types/basketball";
 import type { Match } from "@/types/basketball";
@@ -31,9 +33,25 @@ function getPlayerQuarterPoints(m: Match, playerId: string): { q: number; pts: n
   return out;
 }
 
-export function PlayerMatchRow({ match, playerId, teamId }: { match: Match; playerId: string; teamId: string }) {
+export function PlayerMatchRow({ match, playerId, teamId, player }: { match: Match; playerId: string; teamId: string; player?: Player }) {
   const [open, setOpen] = useState(false);
   const s = computePlayerStats(match.events, playerId);
+  const [sharing, setSharing] = useState<'idle'|'generating'|'done'>('idle');
+
+  const handleShareMatchPerf = async () => {
+    if (!player) return;
+    setSharing('generating');
+    try {
+      const matchTitle = `${match.teamAName} vs ${match.teamBName}`;
+      const matchDate = new Date(match.createdAt).toLocaleDateString('fr-FR');
+      const blob = await generatePlayerMatchImage(player, s, matchTitle, matchDate, '');
+      if (!blob) throw new Error('Canvas failed');
+      const name = `${player.firstName}-${player.lastName}`.replace(/[^a-zA-Z0-9]/g, '-');
+      await sharePlayerImage(blob, `mvp-basket-${name}-match-${match.id.slice(0,6)}.png`);
+      setSharing('done');
+      setTimeout(() => setSharing('idle'), 2000);
+    } catch { setSharing('idle'); }
+  };
   const idA = match.teamAId || 'A';
   const idB = match.teamBId || 'B';
   const scoreA = getTeamScore(match.events, idA);

@@ -89,29 +89,31 @@ function LiveMatchPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [match?.timerRunning, match?.mode, matchId]);
 
-  // ── DRIFT-FREE SHOT CLOCK ──
+  // ── SHOT CLOCK: esclave du timer, même effet suffit ──
   useEffect(() => {
     if (match?.mode === 'quick') return;
-    if (match?.shotClockRunning) {
-      shotClockRef.current = setInterval(() => {
-        setMatch(prev => {
-          if (!prev || !prev.shotClockRunning) return prev;
-          const elapsed = prev.shotClockStartedAt
-            ? (Date.now() - prev.shotClockStartedAt) / 1000
-            : 1;
-          const remaining = Math.max(0, (prev.shotClockSecondsAtStart ?? prev.shotClockSeconds) - elapsed);
-          const updated: Match = { ...prev, shotClockSeconds: Math.round(remaining) };
-          if (remaining <= 5 && remaining > 4) haptics.shotClockWarning();
-          if (remaining <= 0) updated.shotClockRunning = false;
-          saveMatches(getMatches().map(m => m.id === matchId ? updated : m));
-          return updated;
-        });
-      }, 500);
-    } else {
+    if (!match?.shotClockRunning) {
       if (shotClockRef.current) clearInterval(shotClockRef.current);
+      return;
     }
+    const startedAt = match.shotClockStartedAt ?? Date.now();
+    const secsAtStart = match.shotClockSecondsAtStart ?? match.shotClockSeconds;
+    shotClockRef.current = setInterval(() => {
+      setMatch(prev => {
+        if (!prev || !prev.shotClockRunning) return prev;
+        const elapsed = (Date.now() - startedAt) / 1000;
+        const remaining = Math.max(0, secsAtStart - elapsed);
+        // Synchroniser avec le game clock
+        const syncedRemaining = Math.min(remaining, prev.timerSeconds);
+        const updated: Match = { ...prev, shotClockSeconds: Math.round(syncedRemaining) };
+        if (remaining <= 5 && remaining > 4.5) haptics.shotClockWarning();
+        if (remaining <= 0) updated.shotClockRunning = false;
+        saveMatches(getMatches().map(m => m.id === matchId ? updated : m));
+        return updated;
+      });
+    }, 250);
     return () => { if (shotClockRef.current) clearInterval(shotClockRef.current); };
-  }, [match?.shotClockRunning, match?.mode, matchId]);
+  }, [match?.shotClockRunning, match?.shotClockStartedAt, match?.mode, matchId]);
 
   if (!match) {
     return (
@@ -157,6 +159,10 @@ function LiveMatchPage() {
       timerRunning: isStarting,
       timerStartedAt: isStarting ? now : undefined,
       timerSecondsAtStart: isStarting ? match.timerSeconds : undefined,
+      // Shot clock suit le chrono
+      shotClockRunning: isStarting ? match.shotClockSeconds > 0 : false,
+      shotClockStartedAt: isStarting ? now : undefined,
+      shotClockSecondsAtStart: isStarting ? match.shotClockSeconds : undefined,
     });
   };
 
@@ -171,12 +177,16 @@ function LiveMatchPage() {
     });
   };
 
-  const resetShotClock = () => persist({
-    ...match,
-    shotClockSeconds: 24,
-    shotClockRunning: false,
-    shotClockStartedAt: undefined,
-  });
+  const resetShotClock = () => {
+    const now = Date.now();
+    persist({
+      ...match,
+      shotClockSeconds: 24,
+      shotClockRunning: match.timerRunning,
+      shotClockStartedAt: match.timerRunning ? now : undefined,
+      shotClockSecondsAtStart: match.timerRunning ? 24 : undefined,
+    });
+  };
 
   const nextQuarter = () => {
     if (match.quarter < 4) {
@@ -187,8 +197,11 @@ function LiveMatchPage() {
         timerRunning: false,
         timerSeconds: 600,
         timerStartedAt: undefined,
+        timerSecondsAtStart: undefined,
         shotClockSeconds: 24,
         shotClockRunning: false,
+        shotClockStartedAt: undefined,
+        shotClockSecondsAtStart: undefined,
       });
     }
   };
@@ -203,7 +216,15 @@ function LiveMatchPage() {
     if (type === '3pt_made') haptics.threePoints();
     else if (type === 'foul_committed') haptics.foul();
     else if (type.endsWith('_made') || type === 'assist' || type.includes('rebound')) haptics.action();
-    persist({ ...match, events: [...match.events, event], shotClockSeconds: 24, shotClockRunning: false });
+    const now2 = Date.now();
+    persist({
+      ...match,
+      events: [...match.events, event],
+      shotClockSeconds: 24,
+      shotClockRunning: match.timerRunning,
+      shotClockStartedAt: match.timerRunning ? now2 : undefined,
+      shotClockSecondsAtStart: match.timerRunning ? 24 : undefined,
+    });
     setSelectedPlayer(null);
   };
 
