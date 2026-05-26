@@ -121,26 +121,29 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
   useEffect(() => { unlockAudio(); }, []);
 
   // ── Timer unifié : chrono + shot clock synchronisés ──────────────────────────
-  // Le shot clock est ESCLAVE du chrono : même startedAt, s'arrête/repart ensemble.
-  // Les deux décomptent depuis le même instant de référence.
+  // Règles FIBA :
+  // - Shot clock = 24s, repart à chaque changement de possession
+  // - Reset à 24 sur panier marqué + repart immédiatement si chrono tourne
+  // - Shot clock s'arrête/repart en même temps que le chrono
+  // - Shot clock ≤ temps de jeu restant (jamais 24s si <24s au quart)
+  // - À 0 : violation, possession adverse (ici : repart à 24 auto)
   useEffect(() => {
     if (!match.timerRunning) return;
 
-    const startedAt     = match.timerStartedAt ?? Date.now();
+    // Capturer le startedAt du chrono pour le game clock
+    const gameStartedAt = match.timerStartedAt ?? Date.now();
     const gameAtStart   = match.timerSecondsAtStart ?? match.timerSeconds;
-    // Shot clock : si running, utilise son propre seconsdAtStart, sinon figé
-    const shotAtStart   = match.shotClockSecondsAtStart ?? match.shotClockSeconds;
-    const shotWasRunning = match.shotClockRunning;
 
     const id = setInterval(() => {
+      // Toujours lire depuis matchRef pour avoir l'état le plus récent
       const m = matchRef.current;
-      const elapsed = (Date.now() - startedAt) / 1000;
+      const now = Date.now();
+      const elapsed = (now - gameStartedAt) / 1000;
 
       // ── Game clock ──
       const gameRemaining = Math.max(0, gameAtStart - elapsed);
 
       if (gameRemaining <= 0) {
-        // Fin de quart-temps
         if (m.quarter < MAX_QUARTERS) {
           haptics.buzzer();
           persistRef.current({
@@ -157,34 +160,50 @@ export function FullScreenScoreboard({ match, onUpdate, onExit }: Props) {
           });
         } else {
           haptics.buzzer();
-          persistRef.current({
-            ...m,
-            timerSeconds: 0,
-            timerRunning: false,
-            shotClockRunning: false,
-          });
+          persistRef.current({ ...m, timerSeconds: 0, timerRunning: false, shotClockRunning: false });
         }
         return;
       }
 
-      // ── Shot clock (synchronisé au même elapsed) ──
-      let shotRemaining = m.shotClockSeconds;
-      if (shotWasRunning) {
-        shotRemaining = Math.max(0, shotAtStart - elapsed);
-        if (shotRemaining <= 5 && shotRemaining > 4.5) haptics.shotClockWarning();
-      }
+      // ── Shot clock — lire l'état ACTUEL depuis matchRef ──
+      // (pas capturé au démarrage de l'effet, sinon les resets ne sont pas vus)
+      let shotSeconds = m.shotClockSeconds;
 
-      // Shot clock ne peut pas dépasser le game clock
-      const syncedShot = Math.min(Math.round(shotRemaining), Math.round(gameRemaining));
+      if (m.shotClockRunning && m.shotClockStartedAt) {
+        const shotElapsed = (now - m.shotClockStartedAt) / 1000;
+        const shotAtStart = m.shotClockSecondsAtStart ?? m.shotClockSeconds;
+        const shotRemaining = Math.max(0, shotAtStart - shotElapsed);
+
+        if (shotRemaining <= 5 && shotRemaining > 4.5) haptics.shotClockWarning();
+
+        if (shotRemaining <= 0) {
+          // Shot clock violation → repart à 24 automatiquement (possession adverse)
+          // En mode scoreboard simplifié : on remet juste à 24 et on repart
+          haptics.foul();
+          persistRef.current({
+            ...m,
+            timerSeconds: Math.round(gameRemaining),
+            shotClockSeconds: 24,
+            shotClockRunning: true,
+            shotClockStartedAt: now,
+            shotClockSecondsAtStart: 24,
+          });
+          return;
+        }
+
+        // Synchroniser : shot clock ≤ game clock
+        shotSeconds = Math.min(Math.round(shotRemaining), Math.round(gameRemaining));
+      }
 
       persistRef.current({
         ...m,
         timerSeconds: Math.round(gameRemaining),
-        shotClockSeconds: shotWasRunning ? syncedShot : m.shotClockSeconds,
+        shotClockSeconds: shotSeconds,
       });
-    }, 250); // 250ms pour plus de fluidité
+    }, 250);
 
     return () => clearInterval(id);
+  // Se redémarre si le timer reprend OU si le startedAt change (après reset/panier)
   }, [match.timerRunning, match.timerStartedAt]);
 
   const teamAKey = match.teamAId || 'A';

@@ -37,6 +37,7 @@ export function PlayerMatchRow({ match, playerId, teamId, player }: { match: Mat
   const [open, setOpen] = useState(false);
   const s = computePlayerStats(match.events, playerId);
   const [sharing, setSharing] = useState<'idle'|'generating'|'done'>('idle');
+  const [pdfState, setPdfState] = useState<'idle'|'generating'|'done'>('idle');
 
   const handleShareMatchPerf = async () => {
     if (!player) return;
@@ -52,6 +53,21 @@ export function PlayerMatchRow({ match, playerId, teamId, player }: { match: Mat
       setTimeout(() => setSharing('idle'), 2000);
     } catch { setSharing('idle'); }
   };
+  const handlePdfMatchPerf = async () => {
+    if (!player) return;
+    setPdfState('generating');
+    try {
+      const { generatePlayerMatchPDF } = await import('@/lib/pdfExport');
+      await generatePlayerMatchPDF({
+        player,
+        stats: s,
+        match,
+      });
+      setPdfState('done');
+      setTimeout(() => setPdfState('idle'), 2500);
+    } catch { setPdfState('idle'); }
+  };
+
   const idA = match.teamAId || 'A';
   const idB = match.teamBId || 'B';
   const scoreA = getTeamScore(match.events, idA);
@@ -140,32 +156,42 @@ export function PlayerMatchRow({ match, playerId, teamId, player }: { match: Mat
             </div>
           )}
 
-          {/* Boutons partage + rapport */}
-          <div className="flex gap-2">
+          {/* Boutons partage + PDF + rapport */}
+          <div className="flex gap-1.5">
             {player && (
               <button
                 type="button"
                 onClick={handleShareMatchPerf}
                 disabled={sharing === 'generating'}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition-all active:scale-95 ${
-                  sharing === 'done'
-                    ? 'bg-green-500/15 text-green-600'
-                    : sharing === 'generating'
-                    ? 'bg-secondary text-muted-foreground'
-                    : 'bg-secondary text-foreground hover:bg-secondary/80'
+                className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-bold transition-all active:scale-95 ${
+                  sharing === 'done' ? 'bg-green-500/15 text-green-600'
+                  : sharing === 'generating' ? 'bg-secondary text-muted-foreground'
+                  : 'bg-secondary text-foreground hover:bg-secondary/80'
                 }`}
               >
-                {sharing === 'generating' ? '⏳ Génération…'
-                 : sharing === 'done' ? '✅ Partagé !'
-                 : '🖼 Partager'}
+                {sharing === 'generating' ? '⏳' : sharing === 'done' ? '✅' : '🖼 Image'}
+              </button>
+            )}
+            {player && (
+              <button
+                type="button"
+                onClick={handlePdfMatchPerf}
+                disabled={pdfState === 'generating'}
+                className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-bold transition-all active:scale-95 ${
+                  pdfState === 'done' ? 'bg-green-500/15 text-green-600'
+                  : pdfState === 'generating' ? 'bg-secondary text-muted-foreground'
+                  : 'bg-secondary text-foreground hover:bg-secondary/80'
+                }`}
+              >
+                {pdfState === 'generating' ? '⏳' : pdfState === 'done' ? '✅' : '📄 PDF'}
               </button>
             )}
             <Link
               to="/report/$matchId"
               params={{ matchId: match.id }}
-              className="flex-1 block text-center text-[11px] text-primary font-semibold py-2 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors"
+              className="flex-1 block text-center text-[11px] text-primary font-semibold py-2 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors leading-8"
             >
-              Rapport complet →
+              Rapport →
             </Link>
           </div>
         </div>

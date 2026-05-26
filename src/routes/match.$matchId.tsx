@@ -62,58 +62,79 @@ function LiveMatchPage() {
     saveMatches(matches.map(m => m.id === matchId ? updated : m));
   }, [matchId]);
 
-  // ── DRIFT-FREE GAME TIMER ──
+  // ── DRIFT-FREE GAME TIMER (mode assistant) ──
   useEffect(() => {
     if (match?.mode === 'quick') return;
-    if (match?.timerRunning) {
-      timerRef.current = setInterval(() => {
-        setMatch(prev => {
-          if (!prev || !prev.timerRunning) return prev;
-          const elapsed = prev.timerStartedAt
-            ? (Date.now() - prev.timerStartedAt) / 1000
-            : 1;
-          const remaining = Math.max(0, (prev.timerSecondsAtStart ?? prev.timerSeconds) - elapsed);
-          const updated: Match = { ...prev, timerSeconds: Math.round(remaining) };
-          if (remaining <= 0) {
-            updated.timerRunning = false;
-            updated.timerSeconds = 0;
-            haptics.buzzer();
-          }
-          saveMatches(getMatches().map(m => m.id === matchId ? updated : m));
-          return updated;
-        });
-      }, 500);
-    } else {
+    if (!match?.timerRunning) {
       if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [match?.timerRunning, match?.mode, matchId]);
-
-  // ── SHOT CLOCK: esclave du timer, même effet suffit ──
-  useEffect(() => {
-    if (match?.mode === 'quick') return;
-    if (!match?.shotClockRunning) {
-      if (shotClockRef.current) clearInterval(shotClockRef.current);
       return;
     }
-    const startedAt = match.shotClockStartedAt ?? Date.now();
-    const secsAtStart = match.shotClockSecondsAtStart ?? match.shotClockSeconds;
-    shotClockRef.current = setInterval(() => {
+    const gameStartedAt = match.timerStartedAt ?? Date.now();
+    const gameAtStart   = match.timerSecondsAtStart ?? match.timerSeconds;
+
+    timerRef.current = setInterval(() => {
       setMatch(prev => {
-        if (!prev || !prev.shotClockRunning) return prev;
-        const elapsed = (Date.now() - startedAt) / 1000;
-        const remaining = Math.max(0, secsAtStart - elapsed);
-        // Synchroniser avec le game clock
-        const syncedRemaining = Math.min(remaining, prev.timerSeconds);
-        const updated: Match = { ...prev, shotClockSeconds: Math.round(syncedRemaining) };
-        if (remaining <= 5 && remaining > 4.5) haptics.shotClockWarning();
-        if (remaining <= 0) updated.shotClockRunning = false;
+        if (!prev || !prev.timerRunning) return prev;
+        const now = Date.now();
+        const elapsed = (now - gameStartedAt) / 1000;
+        const gameRemaining = Math.max(0, gameAtStart - elapsed);
+
+        if (gameRemaining <= 0) {
+          // Passage au quart suivant automatique
+          const updated: Match = prev.quarter < 4 ? {
+            ...prev,
+            quarter: prev.quarter + 1,
+            timerSeconds: 600,
+            timerRunning: false,
+            timerStartedAt: undefined,
+            timerSecondsAtStart: undefined,
+            shotClockSeconds: 24,
+            shotClockRunning: false,
+            shotClockStartedAt: undefined,
+            shotClockSecondsAtStart: undefined,
+          } : { ...prev, timerSeconds: 0, timerRunning: false, shotClockRunning: false };
+          haptics.buzzer();
+          saveMatches(getMatches().map(m => m.id === matchId ? updated : m));
+          return updated;
+        }
+
+        // Shot clock
+        let shotSeconds = prev.shotClockSeconds;
+        if (prev.shotClockRunning && prev.shotClockStartedAt) {
+          const shotElapsed = (now - prev.shotClockStartedAt) / 1000;
+          const shotAtStart = prev.shotClockSecondsAtStart ?? prev.shotClockSeconds;
+          const shotRemaining = Math.max(0, shotAtStart - shotElapsed);
+
+          if (shotRemaining <= 5 && shotRemaining > 4.5) haptics.shotClockWarning();
+
+          if (shotRemaining <= 0) {
+            // Shot clock violation → repart à 24
+            haptics.foul();
+            const updated: Match = {
+              ...prev,
+              timerSeconds: Math.round(gameRemaining),
+              shotClockSeconds: 24,
+              shotClockRunning: true,
+              shotClockStartedAt: now,
+              shotClockSecondsAtStart: 24,
+            };
+            saveMatches(getMatches().map(m => m.id === matchId ? updated : m));
+            return updated;
+          }
+
+          shotSeconds = Math.min(Math.round(shotRemaining), Math.round(gameRemaining));
+        }
+
+        const updated: Match = { ...prev, timerSeconds: Math.round(gameRemaining), shotClockSeconds: shotSeconds };
         saveMatches(getMatches().map(m => m.id === matchId ? updated : m));
         return updated;
       });
     }, 250);
-    return () => { if (shotClockRef.current) clearInterval(shotClockRef.current); };
-  }, [match?.shotClockRunning, match?.shotClockStartedAt, match?.mode, matchId]);
+
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [match?.timerRunning, match?.timerStartedAt, match?.mode, matchId]);
+
+  // Shot clock géré dans l'effet du game timer ci-dessus
 
   if (!match) {
     return (

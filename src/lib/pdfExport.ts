@@ -293,9 +293,9 @@ function drawTeamTable(
   doc.setTextColor(...WHITE);
   doc.text(teamName.slice(0, 28), x + 4, y + 7);
   if (isWinner) {
-    doc.setTextColor(...GREEN);
+    doc.setTextColor(GREEN[0], GREEN[1], GREEN[2]);
   } else {
-    doc.setTextColor(...PRIMARY);
+    doc.setTextColor(PRIMARY[0], PRIMARY[1], PRIMARY[2]);
   }
   doc.text(String(totalScore), x + w - 4, y + 7, { align: 'right' });
   y += 11;
@@ -634,4 +634,180 @@ export async function generatePlayerProfilePDF(opts: PlayerPdfOptions): Promise<
 
   const safeName = `${player.firstName}-${player.lastName}`.replace(/[^a-zA-Z0-9]/g, '-');
   doc.save(`mvp-basket-profil-${safeName}.pdf`);
+}
+
+
+// ─── PDF Performance d'un joueur dans un match ────────────────────────────────
+
+export interface PlayerMatchPdfOptions {
+  player: Player;
+  stats: PlayerStats;
+  match: Match;
+}
+
+export async function generatePlayerMatchPDF(opts: PlayerMatchPdfOptions): Promise<void> {
+  const { player, stats, match } = opts;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW = 210, PH = 297, ML = 14, MR = 14, CW = PW - ML - MR;
+
+  const idA = match.teamAId || 'A';
+  const idB = match.teamBId || 'B';
+  const sA = getTeamScore(match.events, idA);
+  const sB = getTeamScore(match.events, idB);
+  const isA = match.playersA.includes(player.id);
+  const myScore = isA ? sA : sB;
+  const oppScore = isA ? sB : sA;
+  const oppName = isA ? match.teamBName : match.teamAName;
+  const won = myScore > oppScore;
+  const date = new Date(match.createdAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  // ── En-tête ──
+  doc.setFillColor(DARK_R, DARK_G, DARK_B);
+  doc.rect(0, 0, PW, 44, 'F');
+
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(`${player.firstName} ${player.lastName}`, ML, 14);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(180, 180, 220);
+  doc.text(`vs ${oppName}  ·  ${date}`, ML, 22);
+
+  // Score du match
+  const scoreLabel = `${isA ? sA : sB} – ${isA ? sB : sA}`;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  if (won) { doc.setTextColor(...GREEN); }
+  else { doc.setTextColor(200, 200, 200); }
+  doc.text(`${won ? '✓ Victoire' : oppScore === myScore ? '= Nul' : '✗ Défaite'}  ${scoreLabel}`, ML, 32);
+
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 190);
+  if (match.matchCategory) {
+    const cats: Record<string, string> = { official: 'Officiel', friendly: 'Amical', training: 'Entraînement', internal: 'Interne', mixed: 'Mixte' };
+    doc.text(cats[match.matchCategory] || '', PW - MR, 32, { align: 'right' });
+  }
+
+  if (player.jerseyNumber !== undefined) {
+    doc.setFillColor(PRIMARY_R, PRIMARY_G, PRIMARY_B);
+    doc.circle(PW - MR - 14, 22, 11, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(player.jerseyNumber >= 10 ? 12 : 15);
+    doc.text(String(player.jerseyNumber), PW - MR - 14, 26, { align: 'center' });
+  }
+
+  let y = 52;
+
+  // ── Stats principales ──
+  doc.setFillColor(...BG);
+  doc.roundedRect(ML, y, CW, 32, 4, 4, 'F');
+
+  const mainStats = [
+    { label: 'POINTS',   value: String(stats.points),         color: PRIMARY },
+    { label: 'REBONDS',  value: String(stats.rebounds) },
+    { label: 'PASSES',   value: String(stats.assists) },
+    { label: 'INT.',     value: String(stats.steals) },
+    { label: 'CONTRES',  value: String(stats.blocks) },
+    { label: 'FAUTES',   value: String(stats.foulsCommitted), color: stats.foulsCommitted >= 4 ? RED : undefined },
+    { label: 'BP',       value: String(stats.turnovers),      color: stats.turnovers >= 3 ? RED : undefined },
+  ];
+  const mW = CW / mainStats.length;
+  mainStats.forEach((s, i) => {
+    const sx = ML + i * mW + mW / 2;
+    const col = s.color ?? (BLACK as [number,number,number]);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(col[0], col[1], col[2]);
+    doc.text(s.value, sx, y + 18, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...GRAY);
+    doc.text(s.label, sx, y + 25, { align: 'center' });
+  });
+  y += 38;
+
+  // ── Tirs ──
+  doc.setFillColor(...BG);
+  doc.roundedRect(ML, y, CW, 28, 3, 3, 'F');
+
+  const shoots = [
+    { label: 'Tirs de jeu (FG)', made: stats.fgMade, att: stats.fgAttempted },
+    { label: 'Paniers 3pts (3P)', made: stats.fg3Made, att: stats.fg3Attempted },
+    { label: 'Lancers francs (LF)', made: stats.ftMade, att: stats.ftAttempted },
+  ];
+  shoots.forEach((s, i) => {
+    const sx = ML + (CW / 3) * i + (CW / 3) / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(BLACK[0], BLACK[1], BLACK[2]);
+    doc.text(`${s.made}/${s.att}`, sx, y + 12, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(PRIMARY_R, PRIMARY_G, PRIMARY_B);
+    doc.text(pct(s.made, s.att), sx, y + 20, { align: 'center' });
+    doc.setFontSize(7);
+    doc.setTextColor(...GRAY);
+    doc.text(s.label, sx, y + 26, { align: 'center' });
+  });
+  y += 34;
+
+  // ── Temps de jeu ──
+  if (stats.minutesPlayed && stats.minutesPlayed > 0) {
+    doc.setFillColor(...BG);
+    doc.roundedRect(ML, y, CW, 14, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(PRIMARY_R, PRIMARY_G, PRIMARY_B);
+    doc.text(`⏱  Temps de jeu : ${formatMin(stats.minutesPlayed)}`, ML + 4, y + 9);
+    y += 20;
+  }
+
+  // ── Points par quart-temps ──
+  const maxQ = Math.max(1, ...match.events.map(e => e.quarter));
+  const quarters = [];
+  for (let q = 1; q <= maxQ; q++) {
+    const evs = match.events.filter(e => e.playerId === player.id && e.quarter === q);
+    const pts = evs.reduce((s, e) => s + (e.type === '2pt_made' ? 2 : e.type === '3pt_made' ? 3 : e.type === 'ft_made' ? 1 : 0), 0);
+    quarters.push({ q, pts });
+  }
+  if (quarters.length > 0) {
+    doc.setFillColor(...BG);
+    doc.roundedRect(ML, y, CW, 24, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...GRAY);
+    doc.text('POINTS PAR QUART-TEMPS', ML + 4, y + 8);
+    const qW = CW / quarters.length;
+    quarters.forEach((q, i) => {
+      const qx = ML + i * qW + qW / 2;
+      doc.setFontSize(12);
+      doc.setTextColor(q.pts > 0 ? PRIMARY_R : DARK_R, q.pts > 0 ? PRIMARY_G : DARK_G, q.pts > 0 ? PRIMARY_B : DARK_B);
+      doc.text(String(q.pts), qx, y + 18, { align: 'center' });
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY);
+      doc.text(`Q${q.q}`, qx, y + 23, { align: 'center' });
+    });
+    y += 30;
+  }
+
+  // ── Légende ──
+  y += 4;
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRAY);
+  const legend = 'PTS=Points  REB=Rebonds  PD=Passes Décisives  INT=Interceptions  CTR=Contres  F=Fautes  BP=Ballons Perdus  FG=Tirs de jeu  3P=Paniers 3pts  LF=Lancers Francs';
+  const lines = doc.splitTextToSize(legend, CW);
+  doc.text(lines, ML, y);
+
+  // ── Pied de page ──
+  doc.setFontSize(7);
+  doc.setTextColor(...GRAY);
+  doc.text('MVP Basket Sénégal  ·  Ababacar Dieng  ·  Génie Logiciel  ·  diengbabacar666@gmail.com', PW / 2, PH - 5, { align: 'center' });
+  doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`, PW - MR, PH - 5, { align: 'right' });
+
+  const safeName = `${player.firstName}-${player.lastName}`.replace(/[^a-zA-Z0-9]/g, '-');
+  const dateStr = new Date(match.createdAt).toISOString().slice(0, 10);
+  doc.save(`mvp-basket-${safeName}-match-${dateStr}.pdf`);
 }
