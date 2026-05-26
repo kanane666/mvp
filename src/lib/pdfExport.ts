@@ -8,7 +8,7 @@ import { jsPDF } from 'jspdf';
 import type { Match, Player, PlayerStats } from '@/types/basketball';
 import { getTeamScore } from '@/types/basketball';
 import { computePlayerStats, getTeamFouls, isTeamInBonus } from '@/types/basketball';
-import { getQuarterScores, getTeamRuns, getMatchPlayerIds } from './playerStats';
+import { getQuarterScores, getTeamRuns, getMatchPlayerIds, type CareerStats } from './playerStats';
 
 export interface PdfRow {
   player: Player;
@@ -430,4 +430,208 @@ function drawTeamTable(
   });
 
   return y + 8;
+}
+
+
+// ─── PDF Profil joueur ────────────────────────────────────────────────────────
+
+
+export interface PlayerPdfOptions {
+  player: Player;
+  career: CareerStats;
+  teamName: string;
+  matches: Match[];
+}
+
+export async function generatePlayerProfilePDF(opts: PlayerPdfOptions): Promise<void> {
+  const { player, career, teamName, matches } = opts;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW = 210, PH = 297, ML = 12, MR = 12, CW = PW - ML - MR;
+  const t = career.totals;
+
+  // ── En-tête ──
+  doc.setFillColor(DARK_R, DARK_G, DARK_B);
+  doc.rect(0, 0, PW, 48, 'F');
+
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text(`${player.firstName} ${player.lastName}`, ML, 18);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(180, 180, 220);
+  doc.text(teamName, ML, 27);
+  if (player.position) {
+    doc.setFontSize(9);
+    doc.setTextColor(PRIMARY_R + 60, PRIMARY_G + 60, PRIMARY_B + 60);
+    doc.text(player.position, ML, 35);
+  }
+
+  // Numéro de maillot
+  if (player.jerseyNumber !== undefined) {
+    doc.setFillColor(PRIMARY_R, PRIMARY_G, PRIMARY_B);
+    doc.setDrawColor(...(WHITE as [number,number,number]));
+    doc.circle(PW - MR - 16, 24, 13, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(player.jerseyNumber >= 10 ? 14 : 18);
+    doc.text(`${player.jerseyNumber}`, PW - MR - 16, 27, { align: 'center' });
+  }
+
+  doc.setTextColor(180, 180, 220);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`MVP Basket Sénégal  ·  ${career.games} matchs`, ML, 43);
+
+  let y = 56;
+
+  // ── Bloc stats de carrière ──
+  doc.setFillColor(...BG);
+  doc.roundedRect(ML, y, CW, 44, 4, 4, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY);
+  doc.text('MOYENNES PAR MATCH', ML + 4, y + 8);
+
+  const avgStats = [
+    { label: 'PTS', value: career.avg.points.toFixed(1) },
+    { label: 'REB', value: career.avg.rebounds.toFixed(1) },
+    { label: 'PD',  value: career.avg.assists.toFixed(1) },
+    { label: 'INT', value: career.avg.steals.toFixed(1) },
+    { label: 'CTR', value: career.avg.blocks.toFixed(1) },
+    { label: 'BP',  value: career.avg.fouls.toFixed(1) },
+    ...(career.avgMinutes > 0 ? [{ label: 'MIN', value: `${Math.floor(career.avgMinutes)}:${Math.round((career.avgMinutes % 1) * 60).toString().padStart(2,'0')}` }] : []),
+    { label: 'EFF', value: career.efficiency > 0 ? `+${career.efficiency}` : String(career.efficiency) },
+  ];
+  const statW = CW / Math.min(avgStats.length, 7);
+  avgStats.slice(0, 7).forEach((s, i) => {
+    const sx = ML + i * statW + statW / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(PRIMARY_R, PRIMARY_G, PRIMARY_B);
+    doc.text(s.value, sx, y + 27, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...GRAY);
+    doc.text(s.label, sx, y + 34, { align: 'center' });
+  });
+  y += 50;
+
+  // ── Tirs ──
+  doc.setFillColor(...BG);
+  doc.roundedRect(ML, y, CW, 24, 3, 3, 'F');
+  const shootStats = [
+    { label: 'Tirs de jeu (FG)', made: t.fgMade, att: t.fgAttempted },
+    { label: 'Paniers 3pts (3P)', made: t.fg3Made, att: t.fg3Attempted },
+    { label: 'Lancers francs (LF)', made: t.ftMade, att: t.ftAttempted },
+  ];
+  shootStats.forEach((s, i) => {
+    const sx = ML + (CW / 3) * i + (CW / 3) / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...BLACK);
+    doc.text(`${s.made}/${s.att}`, sx, y + 11, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setTextColor(PRIMARY_R, PRIMARY_G, PRIMARY_B);
+    doc.text(pct(s.made, s.att), sx, y + 18, { align: 'center' });
+    doc.setFontSize(7);
+    doc.setTextColor(...GRAY);
+    doc.text(s.label, sx, y + 23, { align: 'center' });
+  });
+  y += 30;
+
+  // ── Tableau des derniers matchs ──
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...GRAY);
+  doc.text(`DERNIERS MATCHS (${matches.length})`, ML, y + 6);
+  y += 10;
+
+  const mCols = [
+    { h: 'DATE',    w: 22, align: 'left' as const, key: 'date' },
+    { h: 'ADVERSAIRE', w: 42, align: 'left' as const, key: 'opp' },
+    { h: 'SCORE', w: 20, align: 'center' as const, key: 'score' },
+    { h: 'PTS', w: 12, align: 'center' as const, key: 'pts' },
+    { h: 'REB', w: 12, align: 'center' as const, key: 'reb' },
+    { h: 'PD',  w: 12, align: 'center' as const, key: 'ast' },
+    { h: 'INT', w: 10, align: 'center' as const, key: 'stl' },
+    { h: 'CTR', w: 10, align: 'center' as const, key: 'blk' },
+    { h: 'F',   w: 8,  align: 'center' as const, key: 'foul' },
+    { h: 'FG',  w: 20, align: 'center' as const, key: 'fg' },
+  ];
+
+  // Header
+  doc.setFillColor(230, 230, 245);
+  doc.rect(ML, y, CW, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(...GRAY);
+  let cx = ML;
+  mCols.forEach(c => {
+    doc.text(c.h, c.align === 'center' ? cx + c.w / 2 : cx + 1, y + 4.5, { align: c.align });
+    cx += c.w;
+  });
+  y += 7;
+
+  matches.slice(0, 20).forEach((m, i) => {
+    if (y > PH - 20) { doc.addPage(); y = 14; }
+    const ms = computePlayerStats(m.events, player.id);
+    const idA = m.teamAId || 'A';
+    const sA = getTeamScore(m.events, idA);
+    const sB = getTeamScore(m.events, m.teamBId || 'B');
+    const isA = m.playersA.includes(player.id);
+    const myScore = isA ? sA : sB;
+    const oppScore2 = isA ? sB : sA;
+    const oppName = isA ? m.teamBName : m.teamAName;
+    const won = myScore > oppScore2;
+    const rowH = 6.5;
+
+    if (i % 2 === 0) { doc.setFillColor(248, 248, 253); doc.rect(ML, y - 0.5, CW, rowH, 'F'); }
+    if (won) { doc.setFillColor(230, 250, 235); doc.rect(ML, y - 0.5, CW, rowH, 'F'); }
+
+    const rowVals: Record<string, string> = {
+      date: new Date(m.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+      opp:  `vs ${oppName}`.slice(0, 20),
+      score: `${myScore}-${oppScore2}`,
+      pts:  String(ms.points),
+      reb:  String(ms.rebounds),
+      ast:  String(ms.assists),
+      stl:  String(ms.steals),
+      blk:  String(ms.blocks),
+      foul: String(ms.foulsCommitted),
+      fg:   `${ms.fgMade}/${ms.fgAttempted}`,
+    };
+
+    cx = ML;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    mCols.forEach(c => {
+      const val = rowVals[c.key] ?? '';
+      const isPts = c.key === 'pts';
+      doc.setTextColor(isPts && ms.points >= 15 ? PRIMARY_R : won && c.key === 'score' ? 34 : DARK_R,
+                       isPts && ms.points >= 15 ? PRIMARY_G : won && c.key === 'score' ? 197 : DARK_G,
+                       isPts && ms.points >= 15 ? PRIMARY_B : won && c.key === 'score' ? 94 : DARK_B);
+      doc.setFont('helvetica', isPts && ms.points >= 15 ? 'bold' : 'normal');
+      const tx = c.align === 'center' ? cx + c.w / 2 : cx + 1;
+      doc.text(val, tx, y + 4, { align: c.align });
+      cx += c.w;
+    });
+    y += rowH;
+  });
+
+  // ── Pied de page ──
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text('MVP Basket Sénégal  ·  Ababacar Dieng  ·  diengbabacar666@gmail.com', PW / 2, PH - 5, { align: 'center' });
+    doc.text(`Page ${i}/${pageCount}`, ML, PH - 5);
+    doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`, PW - MR, PH - 5, { align: 'right' });
+  }
+
+  const safeName = `${player.firstName}-${player.lastName}`.replace(/[^a-zA-Z0-9]/g, '-');
+  doc.save(`mvp-basket-profil-${safeName}.pdf`);
 }

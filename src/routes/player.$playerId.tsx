@@ -36,6 +36,7 @@ function PlayerProfilePage() {
   const { playerId } = Route.useParams();
   const [filter, setFilter] = useState<CategoryFilter>('all');
   const [sharingProfile, setSharingProfile] = useState<'idle'|'generating'|'done'>('idle');
+  const [pdfProfile, setPdfProfile] = useState<'idle'|'generating'|'done'>('idle');
   const [sortBy, setSortBy] = useState<'date' | 'points'>('date');
   const [tick, setTick] = useState(0);
 
@@ -75,6 +76,23 @@ function PlayerProfilePage() {
       .map(e => e.rating);
   }, [playerId, tick]);
 
+  // handleExportProfilePDF doit être AVANT tout return conditionnel
+  const handleExportProfilePDF = async () => {
+    if (!info || !career) return;
+    setPdfProfile('generating');
+    try {
+      const { generatePlayerProfilePDF } = await import('@/lib/pdfExport');
+      await generatePlayerProfilePDF({
+        player: info.player,
+        career,
+        teamName: info.teamName,
+        matches: sortedMatches,
+      });
+      setPdfProfile('done');
+      setTimeout(() => setPdfProfile('idle'), 2500);
+    } catch { setPdfProfile('idle'); }
+  };
+
   // handleShareProfile doit être AVANT tout return conditionnel
   const handleShareProfile = async () => {
     if (!info || !career) return;
@@ -107,18 +125,32 @@ function PlayerProfilePage() {
       <header className="px-5 pt-8 pb-3 flex items-center gap-2">
         <Link to="/stats"><Button variant="ghost" size="icon">←</Button></Link>
         <h1 className="text-lg font-bold text-foreground flex-1">Profil joueur</h1>
-        <button
-          type="button"
-          onClick={handleShareProfile}
-          disabled={sharingProfile === 'generating'}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
-            sharingProfile === 'done' ? 'bg-green-500/20 text-green-600'
-            : sharingProfile === 'generating' ? 'bg-primary/10 text-primary/50'
-            : 'bg-primary/10 text-primary'
-          }`}
-        >
-          {sharingProfile === 'generating' ? '⏳' : sharingProfile === 'done' ? '✅' : '🖼 Partager'}
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={handleShareProfile}
+            disabled={sharingProfile === 'generating'}
+            className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+              sharingProfile === 'done' ? 'bg-green-500/20 text-green-600'
+              : sharingProfile === 'generating' ? 'bg-primary/10 text-primary/50'
+              : 'bg-primary/10 text-primary'
+            }`}
+          >
+            {sharingProfile === 'generating' ? '⏳' : sharingProfile === 'done' ? '✅' : '🖼'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportProfilePDF}
+            disabled={pdfProfile === 'generating'}
+            className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+              pdfProfile === 'done' ? 'bg-green-500/20 text-green-600'
+              : pdfProfile === 'generating' ? 'bg-secondary text-muted-foreground'
+              : 'bg-secondary text-foreground hover:bg-secondary/80'
+            }`}
+          >
+            {pdfProfile === 'generating' ? '⏳' : pdfProfile === 'done' ? '✅' : '📄'}
+          </button>
+        </div>
       </header>
 
       {/* Hero card */}

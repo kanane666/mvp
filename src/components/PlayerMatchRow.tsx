@@ -140,13 +140,34 @@ export function PlayerMatchRow({ match, playerId, teamId, player }: { match: Mat
             </div>
           )}
 
-          <Link
-            to="/report/$matchId"
-            params={{ matchId: match.id }}
-            className="block text-center text-[11px] text-primary font-semibold py-2 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors"
-          >
-            Voir le rapport complet →
-          </Link>
+          {/* Boutons partage + rapport */}
+          <div className="flex gap-2">
+            {player && (
+              <button
+                type="button"
+                onClick={handleShareMatchPerf}
+                disabled={sharing === 'generating'}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition-all active:scale-95 ${
+                  sharing === 'done'
+                    ? 'bg-green-500/15 text-green-600'
+                    : sharing === 'generating'
+                    ? 'bg-secondary text-muted-foreground'
+                    : 'bg-secondary text-foreground hover:bg-secondary/80'
+                }`}
+              >
+                {sharing === 'generating' ? '⏳ Génération…'
+                 : sharing === 'done' ? '✅ Partagé !'
+                 : '🖼 Partager'}
+              </button>
+            )}
+            <Link
+              to="/report/$matchId"
+              params={{ matchId: match.id }}
+              className="flex-1 block text-center text-[11px] text-primary font-semibold py-2 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors"
+            >
+              Rapport complet →
+            </Link>
+          </div>
         </div>
       )}
     </div>
