@@ -130,6 +130,21 @@ Une fois installée, l'app fonctionne même sans connexion internet (les donnée
 
 ---
 
+### 10. Page Effectifs 👥
+
+La page **Effectifs** (accessible depuis l'accueil) centralise tous tes joueurs par équipe. Sélectionne une équipe dans la barre horizontale en haut pour voir tous ses joueurs triés par numéro de maillot. Pour chaque joueur tu vois directement ses moyennes (points, rebonds, passes) sans avoir à ouvrir son profil. Un champ de recherche apparaît si l'équipe a plus de 5 joueurs. Un clic sur un joueur ouvre son profil complet.
+
+---
+
+### 11. Comparateur de joueurs ⚖️
+
+Dans **Stats → Comparer**, sélectionne deux joueurs de n'importe quelle équipe. L'app affiche :
+- Un **radar chart** à 7 axes : Points, Rebonds, Passes, Interceptions, Contres, FG%, Efficacité. Les valeurs sont normalisées (100 = meilleur des deux sur chaque axe).
+- Un **tableau comparatif** ligne par ligne avec les vraies moyennes. La valeur la plus haute est surlignée en couleur.
+- Des liens directs vers le profil complet de chaque joueur.
+
+---
+
 ## Déploiement (pour les développeurs)
 
 ### Prérequis
@@ -184,6 +199,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGci...
 | v1.0 | Build initial — équipes, matchs rapides, mode assistant |
 | v2.0 | Correction bugs Vercel, timer drift-free, alertes fautes |
 | v3.0 | Rotations + temps de jeu, export image/PDF, calendrier, cloud Supabase, PWA |
+| v4.0 | Page Effectifs, Comparateur de joueurs, PDF profil/performance, partage image joueur, shot clock synchronisé, bannière mise à jour PWA |
 
 ---
 

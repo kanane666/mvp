@@ -10,6 +10,7 @@ const TABS = [
   { to: "/stats/friendly", label: "🤝 Amical" },
   { to: "/stats/training", label: "🏀 Entraînement" },
   { to: "/stats/history", label: "📚 Historique" },
+  { to: "/stats/compare", label: "⚖️ Comparer" },
 ] as const;
 
 function StatsLayout() {

@@ -110,18 +110,21 @@ function HomePage() {
           </div>
         </Link>
 
-        {/* Équipes */}
-        <Link to="/teams" className="block">
-          <div className="bg-card rounded-2xl p-4 border border-border hover:border-primary/40 transition-colors active:scale-[0.98]">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-foreground">Équipes</h2>
-                <p className="text-muted-foreground text-xs mt-0.5">{teamCount} équipe{teamCount !== 1 ? 's' : ''}</p>
-              </div>
-              <span className="text-2xl">👥</span>
+        {/* Équipes + Effectifs */}
+        <div className="flex gap-2.5">
+          <Link to="/teams" className="block flex-1">
+            <div className="bg-card rounded-2xl p-4 border border-border hover:border-primary/40 transition-colors active:scale-[0.98]">
+              <h2 className="text-base font-bold text-foreground">Équipes</h2>
+              <p className="text-muted-foreground text-xs mt-0.5">{teamCount} équipe{teamCount !== 1 ? 's' : ''}</p>
             </div>
-          </div>
-        </Link>
+          </Link>
+          <Link to="/roster" className="block flex-1">
+            <div className="bg-card rounded-2xl p-4 border border-border hover:border-primary/40 transition-colors active:scale-[0.98]">
+              <h2 className="text-base font-bold text-foreground">👥 Effectifs</h2>
+              <p className="text-muted-foreground text-xs mt-0.5">Tous les joueurs</p>
+            </div>
+          </Link>
+        </div>
 
         {/* Entraînements */}
         <Link to="/trainings" className="block">

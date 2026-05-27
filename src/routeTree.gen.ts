@@ -27,6 +27,8 @@ import { Route as MatchNewRouteImport } from './routes/match.new'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as RosterRouteImport } from './routes/roster'
+import { Route as StatsCompareRouteImport } from './routes/stats.compare'
 import { Route as StatsTeamTeamIdRouteImport } from './routes/stats.team.$teamId'
 
 const TrainingsRoute = TrainingsRouteImport.update({
@@ -57,6 +59,18 @@ const IndexRoute = IndexRouteImport.update({
 const StatsTeamTeamIdRoute = StatsTeamTeamIdRouteImport.update({
   id: '/stats/team/$teamId',
   path: '/team/$teamId',
+  getParentRoute: () => StatsRoute,
+} as any)
+
+const RosterRoute = RosterRouteImport.update({
+  id: '/roster',
+  path: '/roster',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+const StatsCompareRoute = StatsCompareRouteImport.update({
+  id: '/stats/compare',
+  path: '/compare',
   getParentRoute: () => StatsRoute,
 } as any)
 
@@ -365,6 +379,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StatsTeamTeamIdRouteImport
       parentRoute: typeof StatsRouteImport
     }
+    '/roster': {
+      id: '/roster'
+      path: '/roster'
+      fullPath: '/roster'
+      preLoaderRoute: typeof RosterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stats/compare': {
+      id: '/stats/compare'
+      path: '/compare'
+      fullPath: '/stats/compare'
+      preLoaderRoute: typeof StatsCompareRouteImport
+      parentRoute: typeof StatsRouteImport
+    }
     '/calendar': {
       id: '/calendar'
       path: '/calendar'
@@ -396,6 +424,7 @@ interface StatsRouteChildren {
   StatsTrainingRoute: typeof StatsTrainingRoute
   StatsIndexRoute: typeof StatsIndexRoute
   StatsTeamTeamIdRoute: typeof StatsTeamTeamIdRoute
+  StatsCompareRoute: typeof StatsCompareRoute
 }
 
 const StatsRouteChildren: StatsRouteChildren = {
@@ -405,6 +434,7 @@ const StatsRouteChildren: StatsRouteChildren = {
   StatsTrainingRoute: StatsTrainingRoute,
   StatsIndexRoute: StatsIndexRoute,
   StatsTeamTeamIdRoute: StatsTeamTeamIdRoute,
+  StatsCompareRoute: StatsCompareRoute,
 }
 
 const StatsRouteWithChildren = StatsRoute._addFileChildren(StatsRouteChildren)
@@ -423,6 +453,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrainingNewRoute: TrainingNewRoute,
   SettingsRoute: SettingsRoute,
   CalendarRoute: CalendarRoute,
+  RosterRoute: RosterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
