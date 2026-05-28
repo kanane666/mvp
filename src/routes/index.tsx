@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { getTeams, getMatches, saveMatches, generateId } from "@/lib/storage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { isAdmin, isCoachPro } from "@/lib/auth";
 import type { Match, Team } from "@/types/basketball";
 import mvpLogo from "@/assets/mvp-logo.png";
 
@@ -11,6 +13,7 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
   const [teamCount, setTeamCount] = useState(0);
   const [matchCount, setMatchCount] = useState(0);
   const [liveMatch, setLiveMatch] = useState<string | null>(null);
@@ -61,11 +64,31 @@ function HomePage() {
             <p className="text-muted-foreground text-[10px]">Basket Sénégal</p>
           </div>
         </div>
-        <Link to="/settings">
-          <button type="button" className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-            ⚙
-          </button>
-        </Link>
+        <div className="flex items-center gap-1.5">
+          {isAdmin() && (
+            <Link to="/admin">
+              <button type="button" className="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center text-red-500 text-sm hover:bg-red-500/25 transition-colors">
+                🔑
+              </button>
+            </Link>
+          )}
+          {!currentUser ? (
+            <Link to="/auth">
+              <button type="button" className="text-[11px] font-bold text-primary px-2.5 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors">
+                Connexion
+              </button>
+            </Link>
+          ) : (
+            <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center text-primary text-xs font-black">
+              {currentUser.displayName?.[0] || currentUser.email[0].toUpperCase()}
+            </div>
+          )}
+          <Link to="/settings">
+            <button type="button" className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+              ⚙
+            </button>
+          </Link>
+        </div>
       </header>
 
       {/* Match en cours */}
@@ -153,6 +176,20 @@ function HomePage() {
             </div>
           </Link>
         </div>
+
+        {/* Classements D2 */}
+        <Link to="/league" className="block">
+          <div className="bg-card rounded-2xl p-4 border border-primary/30 hover:border-primary/60 transition-colors active:scale-[0.98]"
+               style={{ background: 'linear-gradient(135deg, var(--primary)/5%, transparent)' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-foreground">🇸🇳 Classements D2</h2>
+                <p className="text-muted-foreground text-xs mt-0.5">Nationale 2 · page publique</p>
+              </div>
+              <span className="text-2xl">📊</span>
+            </div>
+          </div>
+        </Link>
 
         <Link to="/calendar" className="block">
           <div className="bg-card rounded-2xl p-4 border border-border hover:border-primary/40 transition-colors active:scale-[0.98]">

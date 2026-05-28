@@ -145,6 +145,38 @@ Dans **Stats → Comparer**, sélectionne deux joueurs de n'importe quelle équi
 
 ---
 
+### 12. Classements Nationale 2 🇸🇳
+
+La page **/league** est une page **publique** (sans compte requis) qui affiche les classements du championnat sénégalais. Elle est accessible directement depuis l'accueil.
+
+**Format du championnat implémenté :**
+- Nationale 1 (N1) : 2 poules de 7 équipes, les 2 premiers de chaque poule en demi-finales, finale, vainqueur qualifié pour la BAL
+- Nationale 2 (N2) : plusieurs poules, 1er de chaque poule → tournoi de montée direct, 2ème → barrages puis tournoi de montée
+
+**Contenu de la page classements :**
+- Sélecteur N1 / N2, Masculin / Féminin, saison
+- Classement par poule : J/V/D, différentiel, points de championnat (V=2, D=1), badges 1er → Tournoi montée / 2ème → Barrages
+- Top scoreurs, rebondeurs et passeurs de la division avec leurs moyennes
+- Liens vers le profil complet de chaque joueur
+
+**Comment un coach publie ses stats :**
+Lors de la création d'un match en mode assistant → choisir "Match Officiel" → sélectionner la division (N1/N2), la poule, et activer "Rendre public". Les stats de ce match apparaissent automatiquement dans les classements.
+
+---
+
+### 13. Lien de suivi en direct 🔴
+
+Quand un match est marqué comme public, un lien de la forme `mvp-basket.vercel.app/live/abc12345` est généré. N'importe qui avec ce lien (sans compte) peut suivre le match en temps réel :
+- Score en direct avec chronomètre
+- Fautes d'équipe et bonus
+- Fil des 8 dernières actions
+- Score par quart-temps (si match terminé)
+- Mise à jour automatique toutes les 15 secondes
+
+Le lien est partageable depuis la page rapport de match.
+
+---
+
 ## Déploiement (pour les développeurs)
 
 ### Prérequis
@@ -200,6 +232,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGci...
 | v2.0 | Correction bugs Vercel, timer drift-free, alertes fautes |
 | v3.0 | Rotations + temps de jeu, export image/PDF, calendrier, cloud Supabase, PWA |
 | v4.0 | Page Effectifs, Comparateur de joueurs, PDF profil/performance, partage image joueur, shot clock synchronisé, bannière mise à jour PWA |
+| v5.0 | Classements D2 publics, lien suivi en direct, options championnat N1/N2/poule dans la création de match |
 
 ---
 

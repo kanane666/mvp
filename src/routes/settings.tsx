@@ -140,6 +140,23 @@ function SettingsPage() {
           </div>
         </section>
 
+        {/* ── SQL mise à jour D2 ── */}
+        {isSupabaseConfigured && (
+          <section className="bg-card rounded-2xl p-5 border border-primary/20 space-y-3">
+            <h2 className="text-sm font-bold text-foreground">🏆 Activer les classements D2</h2>
+            <p className="text-xs text-muted-foreground">
+              Exécute ce SQL dans Supabase → SQL Editor pour activer les classements publics et les liens de suivi.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(SQL_LEAGUE)}
+              className="w-full py-2 rounded-xl bg-primary/10 text-primary text-xs font-semibold active:scale-95 transition-transform"
+            >
+              📋 Copier le SQL D2
+            </button>
+          </section>
+        )}
+
         {/* ── Installer PWA ── */}
         <section className="bg-card rounded-2xl p-5 border border-border space-y-3">
           <h2 className="text-sm font-bold text-foreground">📱 Installer l'app</h2>
@@ -195,3 +212,45 @@ function SettingsPage() {
   );
 }
 
+
+
+// ─── SQL mise à jour pour les classements D2 ─────────────────────────────────
+const SQL_LEAGUE = `-- MVP Basket Sénégal — Mise à jour pour classements D2
+-- Exécute dans Supabase Dashboard → SQL Editor
+
+-- Ajouter les colonnes championnat à la table matches
+alter table matches add column if not exists division text;
+alter table matches add column if not exists poule text;
+alter table matches add column if not exists season text;
+alter table matches add column if not exists "shareToken" text unique;
+alter table matches add column if not exists "isPublic" boolean default false;
+alter table matches add column if not exists "clubName" text;
+
+-- Index pour les recherches rapides
+create index if not exists idx_matches_division on matches(division);
+create index if not exists idx_matches_season on matches(season);
+create index if not exists idx_matches_share_token on matches("shareToken");
+create index if not exists idx_matches_public on matches("isPublic") where "isPublic" = true;
+
+-- Policy lecture publique : les matchs publics sont lisibles par TOUS (même sans compte)
+drop policy if exists "matches_public_read" on matches;
+create policy "matches_public_read" on matches
+  for select
+  using ("isPublic" = true OR auth.uid() = user_id);
+
+-- Policy lecture par shareToken (pour le suivi en direct)
+drop policy if exists "matches_share_token_read" on matches;
+create policy "matches_share_token_read" on matches
+  for select
+  using ("shareToken" is not null AND "shareToken" != '');
+
+-- Combiner les deux policies en une
+drop policy if exists "matches_public_read" on matches;
+drop policy if exists "matches_share_token_read" on matches;
+create policy "matches_read" on matches
+  for select
+  using (
+    "isPublic" = true
+    OR ("shareToken" is not null AND "shareToken" != '')
+    OR auth.uid() = user_id
+  );`;

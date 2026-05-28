@@ -11,8 +11,12 @@ import {
   getEvaluations, saveEvaluations,
 } from './lib/storage'
 import { initSync } from './lib/sync'
+import { initAuth } from './lib/auth'
 
 const router = getRouter()
+
+// ── Auth au démarrage ────────────────────────────────────────────────────────
+initAuth().catch(() => {}); // silencieux si Supabase non configuré
 
 // ── Sync au démarrage ─────────────────────────────────────────────────────────
 // Lance la sync en background SANS bloquer le rendu de l'UI

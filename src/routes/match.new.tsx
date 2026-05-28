@@ -27,6 +27,12 @@ function NewMatchPage() {
   const [opponentTeamId, setOpponentTeamId] = useState("");
   const [step, setStep] = useState<Step>('type');
 
+  // Championnat fields
+  const [division, setDivision] = useState<Division>(null);
+  const [poule, setPoule] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [showLeagueOptions, setShowLeagueOptions] = useState(false);
+
   // Player selection
   const [groupA, setGroupA] = useState<string[]>([]);
   const [groupB, setGroupB] = useState<string[]>([]);
@@ -167,6 +173,11 @@ function NewMatchPage() {
       timeoutsB: 0,
       status: 'live',
       createdAt: Date.now(),
+      division: division || undefined,
+      poule: poule || undefined,
+      season: division ? currentSeason() : undefined,
+      isPublic: isPublic || undefined,
+      shareToken: isPublic && isCoachPro() ? generateShareToken() : undefined,
     };
     const matches = getMatches();
     saveMatches([...matches, match]);
@@ -192,12 +203,17 @@ function NewMatchPage() {
         <div className="px-5 space-y-3 pb-8">
           <p className="text-sm text-muted-foreground mb-2">Quel type de match ?</p>
 
-          <button type="button" onClick={() => handleSelectType('official', 'official')} className="w-full text-left p-5 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors active:scale-[0.98]">
+          <button type="button" onClick={() => { handleSelectType('official', 'official'); setShowLeagueOptions(true); }} className="w-full text-left p-5 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors active:scale-[0.98]">
             <div className="flex items-center gap-3">
               <span className="text-3xl">🏆</span>
               <div>
                 <h3 className="font-bold text-foreground text-base">Match Officiel</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">Compétition · stats officielles · 12 joueurs recommandés</p>
+                <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                  <span className="text-[10px] bg-primary/15 text-primary px-2 py-0.5 rounded-full font-semibold">N1 / N2</span>
+                  <span className="text-[10px] bg-green-500/15 text-green-600 px-2 py-0.5 rounded-full font-semibold">Lien public</span>
+                  <span className="text-[10px] bg-amber-500/15 text-amber-600 px-2 py-0.5 rounded-full font-semibold">Classements</span>
+                </div>
               </div>
             </div>
           </button>

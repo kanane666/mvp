@@ -215,6 +215,56 @@ function ReportPage() {
         </div>
       </section>
 
+      {/* Lien de suivi public */}
+      {match.shareToken && (
+        <section className="px-5 mb-4">
+          <div className="bg-primary/8 rounded-2xl border border-primary/25 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-primary mb-1">🔗 Lien de suivi public</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Partage ce lien pour que n'importe qui suive le match en direct.
+                </p>
+                <p className="text-[10px] font-mono text-foreground mt-1 truncate">
+                  {window.location.origin}/live/{match.shareToken}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = `${window.location.origin}/live/${match.shareToken}`;
+                  if (navigator.share) {
+                    navigator.share({ title: `${match.teamAName} vs ${match.teamBName}`, url }).catch(() => {});
+                  } else {
+                    navigator.clipboard?.writeText(url);
+                  }
+                }}
+                className="flex-shrink-0 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold active:scale-95 transition-transform"
+              >
+                Partager
+              </button>
+            </div>
+            {match.division && (
+              <div className="flex gap-2 mt-2">
+                <span className="text-[10px] bg-primary/15 text-primary px-2 py-0.5 rounded-full font-semibold">
+                  {match.division === 'N2' ? 'Nationale 2' : match.division === 'N1' ? 'Nationale 1' : 'Régionale'}
+                </span>
+                {match.poule && (
+                  <span className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">
+                    {match.poule}
+                  </span>
+                )}
+                {match.season && (
+                  <span className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">
+                    {match.season}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Top performers */}
       {(data.top.topScorer || data.top.topAssister || data.top.topRebounder) && (
         <section className="px-5 mb-4">

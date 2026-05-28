@@ -90,7 +90,7 @@ export async function pushMatches(matches: Match[]): Promise<void> {
     setStatus('syncing');
     const rows = matches.map(m => ({ ...m, user_id: userId }));
     const { error } = await supabase.from('matches').upsert(rows, { onConflict: 'id' });
-    if (error) throw error;
+    if (error) { console.warn('Push matches error:', error.message); throw error; }
     setStatus('synced');
   } catch {
     setStatus('error');

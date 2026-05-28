@@ -4,6 +4,8 @@ export type Position = 'PG' | 'SG' | 'SF' | 'PF' | 'C';
 export type StrongHand = 'Droite' | 'Gauche' | 'Les deux';
 export type MatchType = 'training' | 'official' | 'mixed';
 export type MatchCategory = 'official' | 'friendly' | 'training' | 'internal' | 'mixed';
+export type Division = 'N1' | 'N2' | 'regional' | null;
+export type Gender = 'Masculin' | 'Féminin';
 
 export const MATCH_CATEGORY_LABELS: Record<MatchCategory, string> = {
   official: 'Officiel',
@@ -12,6 +14,21 @@ export const MATCH_CATEGORY_LABELS: Record<MatchCategory, string> = {
   internal: 'Interne',
   mixed: 'Mixte',
 };
+
+export const DIVISION_LABELS: Record<NonNullable<Division>, string> = {
+  N1: 'Nationale 1',
+  N2: 'Nationale 2',
+  regional: 'Régionale',
+};
+
+// Saison courante — format "2024-2025"
+export function currentSeason(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  // Le championnat sénégalais commence en janvier — saison = année précédente/année
+  const start = now.getMonth() >= 9 ? y : y - 1; // >oct = nouvelle saison
+  return `${start}-${start + 1}`;
+}
 
 const SCORE_EVENTS: ReadonlySet<string> = new Set(['2pt_made', '3pt_made', 'ft_made']);
 export function isScoreEvent(type: string): boolean {
@@ -92,6 +109,13 @@ export interface Match {
   activePlayersA?: string[];
   activePlayersB?: string[];
   soundEnabled?: boolean;
+  // ── Champs championnat / partage ──
+  division?: Division;
+  poule?: string;           // ex: "Poule A", "Poule B", "Poule Nord"
+  season?: string;          // ex: "2024-2025"
+  shareToken?: string;      // token unique pour le lien public
+  isPublic?: boolean;       // true = visible dans les classements publics
+  clubName?: string;        // nom du club (affiché publiquement)
 }
 
 // Computed stats
