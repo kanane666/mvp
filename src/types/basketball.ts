@@ -5,7 +5,6 @@ export type StrongHand = 'Droite' | 'Gauche' | 'Les deux';
 export type MatchType = 'training' | 'official' | 'mixed';
 export type MatchCategory = 'official' | 'friendly' | 'training' | 'internal' | 'mixed';
 export type Division = 'N1' | 'N2' | 'regional' | null;
-export type Gender = 'Masculin' | 'Féminin';
 
 export const MATCH_CATEGORY_LABELS: Record<MatchCategory, string> = {
   official: 'Officiel',

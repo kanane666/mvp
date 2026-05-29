@@ -1,12 +1,11 @@
-import { Outlet, Link, createRootRoute, useNavigate, useLocation } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { initAuth, getCurrentUser, onAuthChange } from "@/lib/auth";
+import { initAuth } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
-// Routes publiques qui ne nécessitent pas d'onboarding
-const PUBLIC_ROUTES = ["/auth", "/live/", "/league"];
-const isPublicRoute = (path: string) =>
-  PUBLIC_ROUTES.some(r => path.startsWith(r));
+// Routes qui ne nécessitent pas de vérification d'auth
+const SKIP_AUTH_ROUTES = ["/auth", "/live/", "/league"];
+const shouldSkip = (path: string) => SKIP_AUTH_ROUTES.some(r => path.startsWith(r));
 
 function NotFoundComponent() {
   return (
@@ -14,11 +13,9 @@ function NotFoundComponent() {
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page introuvable</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Cette page n'existe pas ou a été déplacée.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Cette page n'existe pas.</p>
         <div className="mt-6">
-          <Link to="/" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+          <Link to="/" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
             Accueil
           </Link>
         </div>
@@ -39,23 +36,24 @@ function RootComponent() {
   useEffect(() => {
     const path = window.location.pathname;
 
-    // Routes publiques → pas de redirect
-    if (isPublicRoute(path)) { setReady(true); return; }
+    // Routes publiques → pas de vérification
+    if (shouldSkip(path)) { setReady(true); return; }
 
-    // Supabase non configuré → app locale directement
+    // Supabase non configuré → app locale directement, pas d'auth
     if (!isSupabaseConfigured) { setReady(true); return; }
 
-    // Vérifier si première visite (jamais vu l'onboarding)
-    const hasVisited = localStorage.getItem('mvp_has_visited');
+    // Mode anonyme explicitement choisi → app directement
+    if (localStorage.getItem('mvp_anonymous') === '1') { setReady(true); return; }
 
-    if (!hasVisited && path === '/') {
-      // Première visite → page auth
-      localStorage.setItem('mvp_has_visited', '1');
-      navigate({ to: '/auth' }).then(() => setReady(true));
-      return;
-    }
+    // Vérifier la session Supabase
+    initAuth().then(user => {
+      if (!user && path === '/') {
+        // Pas connecté + première page → rediriger vers auth
+        navigate({ to: '/auth' });
+      }
+      setReady(true);
+    }).catch(() => setReady(true));
 
-    setReady(true);
   }, []);
 
   if (!ready) {

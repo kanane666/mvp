@@ -71,8 +71,11 @@ function AuthPage() {
   };
 
   const continueAnonymous = () => {
-    localStorage.setItem("mvp_anonymous", "1");
-    navigate({ to: "/" });
+    // Marquer que l'utilisateur a choisi le mode local consciemment
+    localStorage.setItem('mvp_anonymous', '1');
+    // Supprimer le flag has_visited s'il existe
+    localStorage.removeItem('mvp_has_visited');
+    navigate({ to: '/' });
   };
 
   if (!authReady && isSupabaseConfigured) {
