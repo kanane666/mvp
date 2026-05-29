@@ -166,6 +166,29 @@ export async function updateProfile(updates: Partial<Pick<AppUser, 'displayName'
   } catch { return false; }
 }
 
+// ─── Demande de passage coach_pro ────────────────────────────────────────────
+
+export async function requestCoachPro(reason: string, clubName: string): Promise<{ ok: boolean; error?: string }> {
+  if (!supabase || !_currentUser) return { ok: false, error: 'Non connecté.' };
+  try {
+    const { error } = await supabase.from('upgrade_requests').insert({
+      user_id: _currentUser.id,
+      email: _currentUser.email,
+      display_name: _currentUser.displayName || '',
+      club_name: clubName,
+      reason,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    });
+    if (error) return { ok: false, error: error.message };
+    // Mettre à jour le club name dans le profil
+    if (clubName) await updateProfile({ clubName });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message };
+  }
+}
+
 // ─── Guards de rôle ───────────────────────────────────────────────────────────
 export function isAdmin(): boolean { return _currentUser?.role === 'admin'; }
 export function isCoachPro(): boolean {

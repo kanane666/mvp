@@ -1,7 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { sendMagicLink, signInWithPassword, signUpWithPassword, getCurrentUser } from "@/lib/auth";
+import {
+  sendMagicLink, signInWithPassword, signUpWithPassword,
+  getCurrentUser, initAuth,
+} from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import mvpLogo from "@/assets/mvp-logo.png";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -17,10 +21,19 @@ function AuthPage() {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
-  // Redirect if already logged in
   useEffect(() => {
-    if (getCurrentUser()) navigate({ to: "/" });
+    // Si Supabase non configuré → aller directement à l'app
+    if (!isSupabaseConfigured) {
+      navigate({ to: "/" });
+      return;
+    }
+    // Déjà connecté → app
+    initAuth().then(user => {
+      if (user) navigate({ to: "/" });
+      else setAuthReady(true);
+    });
   }, []);
 
   const handleSubmit = async () => {
@@ -31,13 +44,16 @@ function AuthPage() {
     if (mode === "magic") {
       const res = await sendMagicLink(email.trim());
       setMessage(res.ok
-        ? { ok: true, text: `Lien envoyé à ${email} — vérifie ta boîte mail !` }
+        ? { ok: true, text: `✅ Lien envoyé à ${email} — vérifie ta boîte mail et clique sur le lien.` }
         : { ok: false, text: res.error || "Erreur" }
       );
     } else if (mode === "login") {
       const res = await signInWithPassword(email.trim(), password);
-      if (res.ok) navigate({ to: "/" });
-      else setMessage({ ok: false, text: res.error || "Email ou mot de passe incorrect." });
+      if (res.ok) {
+        navigate({ to: "/" });
+      } else {
+        setMessage({ ok: false, text: res.error || "Email ou mot de passe incorrect." });
+      }
     } else {
       if (!password || password.length < 6) {
         setMessage({ ok: false, text: "Le mot de passe doit faire au moins 6 caractères." });
@@ -46,55 +62,53 @@ function AuthPage() {
       }
       const res = await signUpWithPassword(email.trim(), password, displayName.trim());
       setMessage(res.ok
-        ? { ok: true, text: "Compte créé ! Vérifie ta boîte mail pour confirmer." }
+        ? { ok: true, text: "✅ Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi." }
         : { ok: false, text: res.error || "Erreur lors de la création du compte." }
       );
+      if (res.ok) setMode("login");
     }
     setLoading(false);
   };
 
-  if (!isSupabaseConfigured) {
+  const continueAnonymous = () => {
+    localStorage.setItem("mvp_anonymous", "1");
+    navigate({ to: "/" });
+  };
+
+  if (!authReady && isSupabaseConfigured) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-5 text-center gap-4">
-        <span className="text-4xl">⚙️</span>
-        <h1 className="text-lg font-bold text-foreground">Cloud non configuré</h1>
-        <p className="text-muted-foreground text-sm max-w-sm">
-          Pour créer un compte, configure d'abord Supabase dans le fichier <code className="text-primary">.env</code>.
-        </p>
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/" })}
-          className="text-primary text-sm font-semibold"
-        >
-          ← Retour
-        </button>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="px-5 pt-10 pb-6 text-center">
-        <span className="text-4xl">🏀</span>
-        <h1 className="text-2xl font-black text-foreground mt-2">MVP Basket Sénégal</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {mode === "login" ? "Connexion à ton compte"
-           : mode === "register" ? "Créer un nouveau compte"
-           : "Connexion sans mot de passe"}
+      {/* Hero */}
+      <div className="px-5 pt-14 pb-8 text-center">
+        <img src={mvpLogo} alt="MVP" className="w-16 h-16 object-contain mx-auto mb-4" />
+        <h1 className="text-3xl font-black text-foreground tracking-tight">MVP Basket</h1>
+        <p className="text-primary font-semibold text-sm mt-0.5">Sénégal</p>
+        <p className="text-muted-foreground text-sm mt-3 max-w-xs mx-auto">
+          Suis tes matchs, gère ton équipe, et rejoins les classements officiels N2.
         </p>
       </div>
 
-      <div className="flex-1 px-5 max-w-sm mx-auto w-full space-y-4">
+      <div className="flex-1 px-5 max-w-sm mx-auto w-full">
         {/* Mode tabs */}
-        <div className="flex gap-1 bg-secondary rounded-2xl p-1">
-          {([["login", "Connexion"], ["register", "S'inscrire"], ["magic", "Magic link"]] as [Mode, string][]).map(([m, label]) => (
+        <div className="flex gap-1 bg-secondary rounded-2xl p-1 mb-4">
+          {([
+            ["login", "Connexion"],
+            ["register", "Inscription"],
+            ["magic", "Magic link"],
+          ] as [Mode, string][]).map(([m, label]) => (
             <button
               key={m}
               type="button"
               onClick={() => { setMode(m); setMessage(null); }}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors ${
-                mode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                mode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {label}
@@ -102,67 +116,81 @@ function AuthPage() {
           ))}
         </div>
 
-        {/* Form */}
         <div className="space-y-3">
+          {/* Nom (inscription seulement) */}
           {mode === "register" && (
             <div>
-              <label className="text-xs text-muted-foreground font-semibold mb-1 block">Ton prénom (optionnel)</label>
+              <label className="text-xs text-muted-foreground font-semibold mb-1.5 block">
+                Ton prénom <span className="text-muted-foreground/50">(optionnel)</span>
+              </label>
               <input
                 type="text"
                 placeholder="Ex: Moustapha"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
               />
             </div>
           )}
 
+          {/* Email */}
           <div>
-            <label className="text-xs text-muted-foreground font-semibold mb-1 block">Adresse email</label>
+            <label className="text-xs text-muted-foreground font-semibold mb-1.5 block">
+              Adresse email
+            </label>
             <input
               type="email"
               placeholder="ton@email.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSubmit()}
-              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
               autoFocus
+              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
             />
           </div>
 
+          {/* Mot de passe */}
           {(mode === "login" || mode === "register") && (
             <div>
-              <label className="text-xs text-muted-foreground font-semibold mb-1 block">Mot de passe</label>
+              <label className="text-xs text-muted-foreground font-semibold mb-1.5 block">
+                Mot de passe
+                {mode === "register" && <span className="text-muted-foreground/50"> (6 caractères min.)</span>}
+              </label>
               <input
                 type="password"
-                placeholder={mode === "register" ? "6 caractères minimum" : "Ton mot de passe"}
+                placeholder={mode === "register" ? "Choisir un mot de passe" : "Ton mot de passe"}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSubmit()}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
               />
             </div>
           )}
 
+          {/* Magic link info */}
           {mode === "magic" && (
-            <p className="text-xs text-muted-foreground bg-secondary rounded-xl px-4 py-3">
-              Tu recevras un lien par email. Clique dessus pour te connecter sans mot de passe. Idéal sur mobile.
-            </p>
+            <div className="bg-primary/8 rounded-xl px-4 py-3 text-xs text-muted-foreground">
+              Tu recevras un lien par email. Clique dessus pour te connecter instantanément — sans mot de passe à retenir. Idéal sur mobile.
+            </div>
           )}
 
+          {/* Message */}
           {message && (
-            <div className={`rounded-xl px-4 py-3 text-xs font-semibold ${
-              message.ok ? "bg-green-500/15 text-green-600" : "bg-destructive/15 text-destructive"
+            <div className={`rounded-xl px-4 py-3 text-xs font-medium leading-relaxed ${
+              message.ok
+                ? "bg-green-500/12 text-green-600 border border-green-500/20"
+                : "bg-destructive/12 text-destructive border border-destructive/20"
             }`}>
               {message.text}
             </div>
           )}
 
+          {/* Bouton principal */}
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={loading || !email.trim()}
-            className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-50"
+            disabled={loading || !email.trim() || (mode !== "magic" && !password)}
+            className="w-full bg-primary text-primary-foreground py-4 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? "⏳ Chargement…"
              : mode === "login" ? "Se connecter →"
@@ -171,32 +199,48 @@ function AuthPage() {
           </button>
         </div>
 
-        {/* Sans compte */}
-        <div className="pt-2 text-center">
-          <p className="text-xs text-muted-foreground mb-2">ou continuer sans compte</p>
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/" })}
-            className="text-xs text-primary font-semibold"
-          >
-            Utiliser l'app en local →
-          </button>
+        {/* Séparateur */}
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground">ou</span>
+          <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* Info roles */}
-        <div className="bg-card rounded-2xl border border-border p-4 text-xs text-muted-foreground space-y-1.5">
-          <p className="font-semibold text-foreground text-[11px]">Pourquoi créer un compte ?</p>
-          <p>✅ Retrouve tes données sur n'importe quel appareil</p>
-          <p>✅ Synchronisation automatique dans le cloud</p>
-          <p>🏆 Les clubs licenciés D1/D2 peuvent publier leurs matchs dans les classements officiels</p>
-          <p className="text-[10px] text-muted-foreground/70 pt-1">
-            Pour devenir club licencié (coach_pro), contacte l'admin après inscription.
-          </p>
+        {/* Continuer sans compte */}
+        <button
+          type="button"
+          onClick={continueAnonymous}
+          className="w-full py-3.5 rounded-2xl border border-border text-sm font-semibold text-foreground hover:bg-secondary transition-colors active:scale-[0.98]"
+        >
+          Continuer sans compte
+        </button>
+
+        <p className="text-[11px] text-muted-foreground text-center mt-2.5">
+          Données stockées localement · Sans synchronisation cloud
+        </p>
+
+        {/* Avantages du compte */}
+        <div className="mt-6 bg-card rounded-2xl border border-border p-4 space-y-2.5">
+          <p className="text-xs font-bold text-foreground mb-1">Avec un compte :</p>
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <span className="text-primary mt-0.5">✓</span>
+            <p>Retrouve tes données sur n'importe quel appareil</p>
+          </div>
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <span className="text-primary mt-0.5">✓</span>
+            <p>Sauvegarde automatique dans le cloud</p>
+          </div>
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <span className="text-amber-500 mt-0.5">★</span>
+            <p>Les clubs licenciés peuvent demander l'accès D1/D2 pour publier dans les classements officiels</p>
+          </div>
         </div>
       </div>
 
-      <div className="py-6 text-center">
-        <p className="text-[10px] text-muted-foreground">MVP Basket Sénégal · Ababacar Dieng</p>
+      <div className="py-8 text-center">
+        <p className="text-[10px] text-muted-foreground">
+          MVP Basket Sénégal · Ababacar Dieng · Génie Logiciel
+        </p>
       </div>
     </div>
   );

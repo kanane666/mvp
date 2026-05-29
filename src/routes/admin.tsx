@@ -9,7 +9,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type AdminTab = "overview" | "users" | "matches" | "reports" | "news";
+type AdminTab = "overview" | "users" | "matches" | "reports" | "news" | "requests";
 
 interface ProfileRow {
   id: string;
@@ -17,6 +17,17 @@ interface ProfileRow {
   role: string;
   display_name?: string;
   club_name?: string;
+  created_at: string;
+}
+
+interface UpgradeRequest {
+  id: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  club_name: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
   created_at: string;
 }
 
@@ -39,8 +50,9 @@ function AdminPage() {
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [pendingMatches, setPendingMatches] = useState<Match[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [requests, setRequests] = useState<UpgradeRequest[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
-  const [stats, setStats] = useState({ users: 0, matches: 0, proclubs: 0, reports: 0 });
+  const [stats, setStats] = useState({ users: 0, matches: 0, proclubs: 0, reports: 0, requests: 0 });
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -53,7 +65,7 @@ function AdminPage() {
 
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadUsers(), loadPendingMatches(), loadReports(), loadNews()]);
+    await Promise.all([loadUsers(), loadPendingMatches(), loadReports(), loadNews(), loadRequests()]);
     setLoading(false);
   };
 
@@ -103,6 +115,18 @@ function AdminPage() {
     }
   };
 
+  const loadRequests = async () => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from('upgrade_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) {
+      setRequests(data as UpgradeRequest[]);
+      setStats(s => ({ ...s, requests: data.filter((r: UpgradeRequest) => r.status === 'pending').length }));
+    }
+  };
+
   const loadNews = async () => {
     if (!supabase) return;
     const { data } = await supabase
@@ -117,6 +141,23 @@ function AdminPage() {
     if (!supabase) return;
     await supabase.from("profiles").update({ role }).eq("id", userId);
     setUsers(u => u.map(p => p.id === userId ? { ...p, role } : p));
+  };
+
+  const approveRequest = async (req: UpgradeRequest) => {
+    if (!supabase) return;
+    // Update role in profiles
+    await supabase.from('profiles').update({ role: 'coach_pro', club_name: req.club_name }).eq('id', req.user_id);
+    // Mark request approved
+    await supabase.from('upgrade_requests').update({ status: 'approved' }).eq('id', req.id);
+    setRequests(r => r.map(x => x.id === req.id ? { ...x, status: 'approved' } : x));
+    setStats(s => ({ ...s, requests: Math.max(0, s.requests - 1) }));
+  };
+
+  const rejectRequest = async (id: string) => {
+    if (!supabase) return;
+    await supabase.from('upgrade_requests').update({ status: 'rejected' }).eq('id', id);
+    setRequests(r => r.map(x => x.id === id ? { ...x, status: 'rejected' } : x));
+    setStats(s => ({ ...s, requests: Math.max(0, s.requests - 1) }));
   };
 
   const verifyMatch = async (matchId: string) => {
@@ -141,6 +182,7 @@ function AdminPage() {
     { id: "matches", label: "🏀 Matchs", badge: pendingMatches.length },
     { id: "reports", label: "🚨 Signalements", badge: stats.reports },
     { id: "news", label: "📰 Actualités" },
+    { id: "requests", label: "⭐ Demandes Pro", badge: stats.requests },
   ];
 
   return (
@@ -193,6 +235,8 @@ function AdminPage() {
           <MatchesTab matches={pendingMatches} onVerify={verifyMatch} />
         ) : tab === "reports" ? (
           <ReportsTab reports={reports} onResolve={resolveReport} />
+        ) : tab === "requests" ? (
+          <RequestsTab requests={requests} onApprove={approveRequest} onReject={rejectRequest} />
         ) : (
           <NewsTab news={news} onRefresh={loadNews} />
         )}
@@ -202,16 +246,17 @@ function AdminPage() {
 }
 
 // ── Vue d'ensemble ─────────────────────────────────────────────────────────────
-function OverviewTab({ stats, loading }: { stats: typeof import("./admin").default extends never ? any : { users: number; matches: number; proclubs: number; reports: number }; loading: boolean }) {
+function OverviewTab({ stats, loading }: { stats: { users: number; matches: number; proclubs: number; reports: number; requests: number }; loading: boolean }) {
   const tiles = [
     { label: "Utilisateurs", value: stats.users, icon: "👥", color: "text-primary" },
     { label: "Clubs pro (D1/D2)", value: stats.proclubs, icon: "🏆", color: "text-amber-500" },
     { label: "Matchs à vérifier", value: stats.matches, icon: "🏀", color: "text-blue-500" },
     { label: "Signalements", value: stats.reports, icon: "🚨", color: "text-destructive" },
+    { label: "Demandes Pro", value: stats.requests, icon: "⭐", color: "text-amber-500" },
   ];
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2">
         {tiles.map(t => (
           <div key={t.label} className="bg-card rounded-2xl border border-border p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -410,6 +455,85 @@ function ReportsTab({ reports, onResolve }: { reports: Report[]; onResolve: (id:
           {resolved.slice(0, 5).map(r => (
             <div key={r.id} className="bg-card rounded-2xl border border-border/50 p-3 opacity-60">
               <p className="text-xs text-muted-foreground">{REPORT_TYPE_LABELS[r.type]} · {r.message.slice(0, 60)}…</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Demandes Coach Pro ────────────────────────────────────────────────────────
+function RequestsTab({ requests, onApprove, onReject }: {
+  requests: UpgradeRequest[];
+  onApprove: (r: UpgradeRequest) => void;
+  onReject: (id: string) => void;
+}) {
+  const pending = requests.filter(r => r.status === 'pending');
+  const processed = requests.filter(r => r.status !== 'pending');
+
+  if (requests.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <span className="text-4xl">⭐</span>
+        <p className="text-foreground font-semibold mt-3">Aucune demande</p>
+        <p className="text-muted-foreground text-sm mt-1">Les demandes de passage Coach Pro apparaissent ici.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {pending.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-amber-500 uppercase tracking-wide">{pending.length} en attente</p>
+          {pending.map(r => (
+            <div key={r.id} className="bg-card rounded-2xl border border-amber-500/25 p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-foreground">{r.display_name || 'Sans nom'}</p>
+                  <p className="text-xs text-muted-foreground">{r.email}</p>
+                  <p className="text-xs text-primary font-semibold">{r.club_name}</p>
+                </div>
+                <span className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString('fr-FR')}</span>
+              </div>
+              <div className="bg-secondary/50 rounded-xl px-3 py-2">
+                <p className="text-xs text-foreground italic">"{r.reason}"</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onApprove(r)}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-green-500/15 text-green-600 hover:bg-green-500/25 active:scale-95 transition-all"
+                >
+                  ✅ Approuver Coach Pro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReject(r.id)}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-95 transition-all"
+                >
+                  ❌ Refuser
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {processed.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Traitées ({processed.length})</p>
+          {processed.slice(0, 10).map(r => (
+            <div key={r.id} className="bg-card rounded-2xl border border-border/50 p-3 opacity-70 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-foreground">{r.display_name || r.email}</p>
+                <p className="text-[10px] text-muted-foreground">{r.club_name}</p>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${
+                r.status === 'approved' ? 'bg-green-500/15 text-green-600' : 'bg-destructive/10 text-destructive'
+              }`}>
+                {r.status === 'approved' ? '✅ Approuvé' : '❌ Refusé'}
+              </span>
             </div>
           ))}
         </div>

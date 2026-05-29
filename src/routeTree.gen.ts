@@ -12,13 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrainingsRouteImport } from './routes/trainings'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as StatsRouteImport } from './routes/stats'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as RosterRouteImport } from './routes/roster'
 import { Route as MatchesRouteImport } from './routes/matches'
-import { Route as LeagueRouteImport } from './routes/league'
-import { Route as CalendarRouteImport } from './routes/calendar'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StatsIndexRouteImport } from './routes/stats.index'
 import { Route as TrainingNewRouteImport } from './routes/training.new'
@@ -27,12 +21,18 @@ import { Route as StatsTrainingRouteImport } from './routes/stats.training'
 import { Route as StatsOfficialRouteImport } from './routes/stats.official'
 import { Route as StatsHistoryRouteImport } from './routes/stats.history'
 import { Route as StatsFriendlyRouteImport } from './routes/stats.friendly'
-import { Route as StatsCompareRouteImport } from './routes/stats.compare'
 import { Route as ReportMatchIdRouteImport } from './routes/report.$matchId'
 import { Route as PlayerPlayerIdRouteImport } from './routes/player.$playerId'
 import { Route as MatchNewRouteImport } from './routes/match.new'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as RosterRouteImport } from './routes/roster'
+import { Route as LeagueRouteImport } from './routes/league'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as LiveShareTokenRouteImport } from './routes/live.$shareToken'
+import { Route as StatsCompareRouteImport } from './routes/stats.compare'
 import { Route as StatsTeamTeamIdRouteImport } from './routes/stats.team.$teamId'
 
 const TrainingsRoute = TrainingsRouteImport.update({
@@ -50,44 +50,67 @@ const StatsRoute = StatsRouteImport.update({
   path: '/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RosterRoute = RosterRouteImport.update({
-  id: '/roster',
-  path: '/roster',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MatchesRoute = MatchesRouteImport.update({
   id: '/matches',
   path: '/matches',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LeagueRoute = LeagueRouteImport.update({
-  id: '/league',
-  path: '/league',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CalendarRoute = CalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
-  getParentRoute: () => rootRouteImport,
+const StatsTeamTeamIdRoute = StatsTeamTeamIdRouteImport.update({
+  id: '/stats/team/$teamId',
+  path: '/team/$teamId',
+  getParentRoute: () => StatsRoute,
 } as any)
+
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+
+const LeagueRoute = LeagueRouteImport.update({
+  id: '/league',
+  path: '/league',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+const LiveShareTokenRoute = LiveShareTokenRouteImport.update({
+  id: '/live/$shareToken',
+  path: '/live/$shareToken',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+const RosterRoute = RosterRouteImport.update({
+  id: '/roster',
+  path: '/roster',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+const StatsCompareRoute = StatsCompareRouteImport.update({
+  id: '/stats/compare',
+  path: '/compare',
+  getParentRoute: () => StatsRoute,
+} as any)
+
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatsIndexRoute = StatsIndexRouteImport.update({
@@ -125,11 +148,6 @@ const StatsFriendlyRoute = StatsFriendlyRouteImport.update({
   path: '/friendly',
   getParentRoute: () => StatsRoute,
 } as any)
-const StatsCompareRoute = StatsCompareRouteImport.update({
-  id: '/compare',
-  path: '/compare',
-  getParentRoute: () => StatsRoute,
-} as any)
 const ReportMatchIdRoute = ReportMatchIdRouteImport.update({
   id: '/report/$matchId',
   path: '/report/$matchId',
@@ -150,35 +168,17 @@ const MatchMatchIdRoute = MatchMatchIdRouteImport.update({
   path: '/match/$matchId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LiveShareTokenRoute = LiveShareTokenRouteImport.update({
-  id: '/live/$shareToken',
-  path: '/live/$shareToken',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const StatsTeamTeamIdRoute = StatsTeamTeamIdRouteImport.update({
-  id: '/team/$teamId',
-  path: '/team/$teamId',
-  getParentRoute: () => StatsRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
-  '/calendar': typeof CalendarRoute
-  '/league': typeof LeagueRoute
   '/matches': typeof MatchesRoute
-  '/roster': typeof RosterRoute
-  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRouteWithChildren
   '/teams': typeof TeamsRoute
   '/trainings': typeof TrainingsRoute
-  '/live/$shareToken': typeof LiveShareTokenRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/match/new': typeof MatchNewRoute
   '/player/$playerId': typeof PlayerPlayerIdRoute
   '/report/$matchId': typeof ReportMatchIdRoute
-  '/stats/compare': typeof StatsCompareRoute
   '/stats/friendly': typeof StatsFriendlyRoute
   '/stats/history': typeof StatsHistoryRoute
   '/stats/official': typeof StatsOfficialRoute
@@ -186,25 +186,16 @@ export interface FileRoutesByFullPath {
   '/training/$sessionId': typeof TrainingSessionIdRoute
   '/training/new': typeof TrainingNewRoute
   '/stats/': typeof StatsIndexRoute
-  '/stats/team/$teamId': typeof StatsTeamTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
-  '/calendar': typeof CalendarRoute
-  '/league': typeof LeagueRoute
   '/matches': typeof MatchesRoute
-  '/roster': typeof RosterRoute
-  '/settings': typeof SettingsRoute
   '/teams': typeof TeamsRoute
   '/trainings': typeof TrainingsRoute
-  '/live/$shareToken': typeof LiveShareTokenRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/match/new': typeof MatchNewRoute
   '/player/$playerId': typeof PlayerPlayerIdRoute
   '/report/$matchId': typeof ReportMatchIdRoute
-  '/stats/compare': typeof StatsCompareRoute
   '/stats/friendly': typeof StatsFriendlyRoute
   '/stats/history': typeof StatsHistoryRoute
   '/stats/official': typeof StatsOfficialRoute
@@ -212,27 +203,18 @@ export interface FileRoutesByTo {
   '/training/$sessionId': typeof TrainingSessionIdRoute
   '/training/new': typeof TrainingNewRoute
   '/stats': typeof StatsIndexRoute
-  '/stats/team/$teamId': typeof StatsTeamTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
-  '/auth': typeof AuthRoute
-  '/calendar': typeof CalendarRoute
-  '/league': typeof LeagueRoute
   '/matches': typeof MatchesRoute
-  '/roster': typeof RosterRoute
-  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRouteWithChildren
   '/teams': typeof TeamsRoute
   '/trainings': typeof TrainingsRoute
-  '/live/$shareToken': typeof LiveShareTokenRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/match/new': typeof MatchNewRoute
   '/player/$playerId': typeof PlayerPlayerIdRoute
   '/report/$matchId': typeof ReportMatchIdRoute
-  '/stats/compare': typeof StatsCompareRoute
   '/stats/friendly': typeof StatsFriendlyRoute
   '/stats/history': typeof StatsHistoryRoute
   '/stats/official': typeof StatsOfficialRoute
@@ -240,28 +222,19 @@ export interface FileRoutesById {
   '/training/$sessionId': typeof TrainingSessionIdRoute
   '/training/new': typeof TrainingNewRoute
   '/stats/': typeof StatsIndexRoute
-  '/stats/team/$teamId': typeof StatsTeamTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin'
-    | '/auth'
-    | '/calendar'
-    | '/league'
     | '/matches'
-    | '/roster'
-    | '/settings'
     | '/stats'
     | '/teams'
     | '/trainings'
-    | '/live/$shareToken'
     | '/match/$matchId'
     | '/match/new'
     | '/player/$playerId'
     | '/report/$matchId'
-    | '/stats/compare'
     | '/stats/friendly'
     | '/stats/history'
     | '/stats/official'
@@ -269,25 +242,16 @@ export interface FileRouteTypes {
     | '/training/$sessionId'
     | '/training/new'
     | '/stats/'
-    | '/stats/team/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
-    | '/auth'
-    | '/calendar'
-    | '/league'
     | '/matches'
-    | '/roster'
-    | '/settings'
     | '/teams'
     | '/trainings'
-    | '/live/$shareToken'
     | '/match/$matchId'
     | '/match/new'
     | '/player/$playerId'
     | '/report/$matchId'
-    | '/stats/compare'
     | '/stats/friendly'
     | '/stats/history'
     | '/stats/official'
@@ -295,26 +259,17 @@ export interface FileRouteTypes {
     | '/training/$sessionId'
     | '/training/new'
     | '/stats'
-    | '/stats/team/$teamId'
   id:
     | '__root__'
     | '/'
-    | '/admin'
-    | '/auth'
-    | '/calendar'
-    | '/league'
     | '/matches'
-    | '/roster'
-    | '/settings'
     | '/stats'
     | '/teams'
     | '/trainings'
-    | '/live/$shareToken'
     | '/match/$matchId'
     | '/match/new'
     | '/player/$playerId'
     | '/report/$matchId'
-    | '/stats/compare'
     | '/stats/friendly'
     | '/stats/history'
     | '/stats/official'
@@ -322,22 +277,14 @@ export interface FileRouteTypes {
     | '/training/$sessionId'
     | '/training/new'
     | '/stats/'
-    | '/stats/team/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
-  AuthRoute: typeof AuthRoute
-  CalendarRoute: typeof CalendarRoute
-  LeagueRoute: typeof LeagueRoute
   MatchesRoute: typeof MatchesRoute
-  RosterRoute: typeof RosterRoute
-  SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRouteWithChildren
   TeamsRoute: typeof TeamsRoute
   TrainingsRoute: typeof TrainingsRoute
-  LiveShareTokenRoute: typeof LiveShareTokenRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   MatchNewRoute: typeof MatchNewRoute
   PlayerPlayerIdRoute: typeof PlayerPlayerIdRoute
@@ -369,53 +316,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StatsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/roster': {
-      id: '/roster'
-      path: '/roster'
-      fullPath: '/roster'
-      preLoaderRoute: typeof RosterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/matches': {
       id: '/matches'
       path: '/matches'
       fullPath: '/matches'
       preLoaderRoute: typeof MatchesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/league': {
-      id: '/league'
-      path: '/league'
-      fullPath: '/league'
-      preLoaderRoute: typeof LeagueRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/calendar': {
-      id: '/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof CalendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -474,13 +379,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StatsFriendlyRouteImport
       parentRoute: typeof StatsRoute
     }
-    '/stats/compare': {
-      id: '/stats/compare'
-      path: '/compare'
-      fullPath: '/stats/compare'
-      preLoaderRoute: typeof StatsCompareRouteImport
-      parentRoute: typeof StatsRoute
-    }
     '/report/$matchId': {
       id: '/report/$matchId'
       path: '/report/$matchId'
@@ -502,11 +400,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MatchNewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/match/$matchId': {
-      id: '/match/$matchId'
-      path: '/match/$matchId'
-      fullPath: '/match/$matchId'
-      preLoaderRoute: typeof MatchMatchIdRouteImport
+    '/stats/team/$teamId': {
+      id: '/stats/team/$teamId'
+      path: '/team/$teamId'
+      fullPath: '/stats/team/$teamId'
+      preLoaderRoute: typeof StatsTeamTeamIdRouteImport
+      parentRoute: typeof StatsRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/league': {
+      id: '/league'
+      path: '/league'
+      fullPath: '/league'
+      preLoaderRoute: typeof LeagueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/live/$shareToken': {
@@ -516,57 +435,85 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LiveShareTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/stats/team/$teamId': {
-      id: '/stats/team/$teamId'
-      path: '/team/$teamId'
-      fullPath: '/stats/team/$teamId'
-      preLoaderRoute: typeof StatsTeamTeamIdRouteImport
-      parentRoute: typeof StatsRoute
+    '/roster': {
+      id: '/roster'
+      path: '/roster'
+      fullPath: '/roster'
+      preLoaderRoute: typeof RosterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stats/compare': {
+      id: '/stats/compare'
+      path: '/compare'
+      fullPath: '/stats/compare'
+      preLoaderRoute: typeof StatsCompareRouteImport
+      parentRoute: typeof StatsRouteImport
+    }
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/match/$matchId': {
+      id: '/match/$matchId'
+      path: '/match/$matchId'
+      fullPath: '/match/$matchId'
+      preLoaderRoute: typeof MatchMatchIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
 interface StatsRouteChildren {
-  StatsCompareRoute: typeof StatsCompareRoute
   StatsFriendlyRoute: typeof StatsFriendlyRoute
   StatsHistoryRoute: typeof StatsHistoryRoute
   StatsOfficialRoute: typeof StatsOfficialRoute
   StatsTrainingRoute: typeof StatsTrainingRoute
   StatsIndexRoute: typeof StatsIndexRoute
   StatsTeamTeamIdRoute: typeof StatsTeamTeamIdRoute
+  StatsCompareRoute: typeof StatsCompareRoute
 }
 
 const StatsRouteChildren: StatsRouteChildren = {
-  StatsCompareRoute: StatsCompareRoute,
   StatsFriendlyRoute: StatsFriendlyRoute,
   StatsHistoryRoute: StatsHistoryRoute,
   StatsOfficialRoute: StatsOfficialRoute,
   StatsTrainingRoute: StatsTrainingRoute,
   StatsIndexRoute: StatsIndexRoute,
   StatsTeamTeamIdRoute: StatsTeamTeamIdRoute,
+  StatsCompareRoute: StatsCompareRoute,
 }
 
 const StatsRouteWithChildren = StatsRoute._addFileChildren(StatsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
-  AuthRoute: AuthRoute,
-  CalendarRoute: CalendarRoute,
-  LeagueRoute: LeagueRoute,
   MatchesRoute: MatchesRoute,
-  RosterRoute: RosterRoute,
-  SettingsRoute: SettingsRoute,
   StatsRoute: StatsRouteWithChildren,
   TeamsRoute: TeamsRoute,
   TrainingsRoute: TrainingsRoute,
-  LiveShareTokenRoute: LiveShareTokenRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
   MatchNewRoute: MatchNewRoute,
   PlayerPlayerIdRoute: PlayerPlayerIdRoute,
   ReportMatchIdRoute: ReportMatchIdRoute,
   TrainingSessionIdRoute: TrainingSessionIdRoute,
   TrainingNewRoute: TrainingNewRoute,
+  SettingsRoute: SettingsRoute,
+  CalendarRoute: CalendarRoute,
+  RosterRoute: RosterRoute,
+  LeagueRoute: LeagueRoute,
+  LiveShareTokenRoute: LiveShareTokenRoute,
+  AuthRoute: AuthRoute,
+  AdminRoute: AdminRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
