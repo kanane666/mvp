@@ -3,7 +3,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getTeams, getMatches, saveMatches, generateId, getPlayerTrainingStats } from "@/lib/storage";
-import type { Team, Match, MatchType, MatchCategory, Player } from "@/types/basketball";
+import type { Team, Match, MatchType, MatchCategory, Player, Division } from "@/types/basketball";
+import { currentSeason } from "@/types/basketball";
+import { generateShareToken } from "@/lib/league";
+import { isCoachPro } from "@/lib/auth";
 
 export const Route = createFileRoute("/match/new")({
   component: NewMatchPage,

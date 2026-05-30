@@ -275,6 +275,13 @@ export async function generateMatchPDF(opts: PdfOptions): Promise<void> {
 }
 
 // ─── Table d'une équipe ───────────────────────────────────────────────────────
+interface PdfCol {
+  h: string;
+  w: number;
+  align: 'left' | 'center' | 'right';
+  key: string;
+}
+
 function drawTeamTable(
   doc: jsPDF,
   x: number, y: number, w: number,
@@ -301,7 +308,7 @@ function drawTeamTable(
   y += 11;
 
   // Colonnes
-  const cols = [
+  const cols: PdfCol[] = [
     { h: '#',       w: 7,  align: 'center' as const, key: 'jerseyNumber' },
     { h: 'JOUEUR',  w: hasMinutes ? 24 : 28, align: 'left' as const, key: 'name' },
     ...(hasMinutes ? [{ h: 'MIN', w: 12, align: 'center' as const, key: 'minutes' }] : []),
@@ -328,8 +335,9 @@ function drawTeamTable(
   doc.setFontSize(6);
   doc.setTextColor(...GRAY);
   cols.forEach(c => {
-    const tx = c.align === 'center' ? cx + c.w / 2 : c.align === 'right' ? cx + c.w : cx + 1;
-    doc.text(c.h, tx, y + 4.5, { align: c.align });
+    const cw = (c as any).w as number;
+    const tx = c.align === 'center' ? cx + cw / 2 : c.align === 'right' ? cx + cw : cx + 1;
+    doc.text(c.h, tx, y + 4.5, { align: c.align as 'left' | 'center' | 'right' });
     cx += c.w;
   });
   y += 7;
@@ -385,8 +393,9 @@ function drawTeamTable(
       else if (isPts && isTop) doc.setTextColor(...PRIMARY);
       else doc.setTextColor(...BLACK);
 
-      const tx = c.align === 'center' ? cx + c.w / 2 : c.align === 'right' ? cx + c.w : cx + 1;
-      doc.text(val, tx, y + 4, { align: c.align });
+      const cw2 = (c as any).w as number;
+      const tx = c.align === 'center' ? cx + cw2 / 2 : c.align === 'right' ? cx + cw2 : cx + 1;
+      doc.text(val, tx, y + 4, { align: c.align as 'left' | 'center' | 'right' });
       cx += c.w;
     });
 
@@ -425,7 +434,7 @@ function drawTeamTable(
       doc.setTextColor(DARK_R, DARK_G, DARK_B);
     }
     const tx = c.align === 'center' ? cx + c.w / 2 : c.align === 'right' ? cx + c.w : cx + 1;
-    doc.text(val, tx, y + 4.5, { align: c.align });
+    doc.text(val, tx, y + 4.5, { align: c.align as 'left' | 'center' | 'right' });
     cx += c.w;
   });
 
@@ -548,7 +557,7 @@ export async function generatePlayerProfilePDF(opts: PlayerPdfOptions): Promise<
   doc.text(`DERNIERS MATCHS (${matches.length})`, ML, y + 6);
   y += 10;
 
-  const mCols = [
+  const mCols: PdfCol[] = [
     { h: 'DATE',    w: 22, align: 'left' as const, key: 'date' },
     { h: 'ADVERSAIRE', w: 42, align: 'left' as const, key: 'opp' },
     { h: 'SCORE', w: 20, align: 'center' as const, key: 'score' },
@@ -614,7 +623,7 @@ export async function generatePlayerProfilePDF(opts: PlayerPdfOptions): Promise<
                        isPts && ms.points >= 15 ? PRIMARY_B : won && c.key === 'score' ? 94 : DARK_B);
       doc.setFont('helvetica', isPts && ms.points >= 15 ? 'bold' : 'normal');
       const tx = c.align === 'center' ? cx + c.w / 2 : cx + 1;
-      doc.text(val, tx, y + 4, { align: c.align });
+      doc.text(val, tx, y + 4, { align: c.align as 'left' | 'center' | 'right' });
       cx += c.w;
     });
     y += rowH;
